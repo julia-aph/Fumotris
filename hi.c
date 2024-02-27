@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-//#include <windows.h>
+#include <windows.h>
 #include <iso646.h>
 
 struct String
@@ -37,10 +37,19 @@ struct String *NewStringAllocate(int size)
     struct String *string = malloc(sizeof(struct String));
 
     string->chars = malloc(size * sizeof(char));
+    string->chars[0] = 0;
+
     string->length = 0;
     string->allocated = size;
 
     return string;
+}
+
+void DestroyString(struct String *string)
+{
+    free(string->chars);
+
+    free(string);
 }
 
 void ConcatChars(struct String *dest, char *chars, int length)
@@ -54,7 +63,7 @@ void ConcatChars(struct String *dest, char *chars, int length)
         dest->allocated = newSize;
     }
 
-    Copy(dest->chars + length, chars, length);
+    Copy(dest->chars + dest->length, chars, length);
     dest->chars[newLength] = 0;
     dest->length = newLength;
 }
@@ -86,6 +95,61 @@ void Insert(struct String *dest, char *chars, int length, int at)
     dest->length = newLength;
 }
 
+struct Buffer
+{
+    unsigned int width;
+    unsigned int height;
+    unsigned int area;
+
+    char *chars;
+    unsigned char **codeBuffer;
+    unsigned char *codeBufferLengths;
+};
+
+struct Buffer *NewBuffer(unsigned int width, unsigned int height)
+{
+    struct Buffer *buffer = malloc(sizeof(struct Buffer));
+    
+    buffer->width = width;
+    buffer->height = height;
+    unsigned int area = width * height;
+    buffer->area = area;
+
+    char *charBuffer = malloc(area * sizeof(char));
+    for(int ch = 0; ch < area; ch++)
+    {
+        // Initialize each character as #
+        charBuffer[ch] = '#';
+    }
+    buffer->chars = charBuffer;
+
+    unsigned char **codeBuffer = malloc(area * sizeof(unsigned char *));
+    unsigned char *codeBufferLengths = malloc(area * sizeof(unsigned char));
+    for(int i = 0; i < area; i++)
+    {
+        // Initialize each character with one code
+        codeBuffer[i] = calloc(1, sizeof(unsigned char));
+        codeBufferLengths[i] = 1;
+    }
+    buffer->codeBuffer = codeBuffer;
+    buffer->codeBufferLengths = codeBufferLengths;
+
+    return buffer;
+}
+
+void DestroyBuffer(struct Buffer *buffer)
+{
+    free(buffer->chars);
+    for(int i = 0; i < buffer->area; i++)
+    {
+        free(buffer->codeBuffer[i]);
+    }
+    free(buffer->codeBuffer);
+    free(buffer->codeBufferLengths);
+
+    free(buffer);
+}
+
 enum PieceType
 {
     n,
@@ -98,6 +162,74 @@ enum PieceType
     L
 };
 
+struct BlockMap
+{
+    unsigned int width;
+    unsigned int height;
+    unsigned int area;
+
+    unsigned int x;
+    unsigned int y;
+
+    unsigned char rotation;
+
+    enum PieceType *blocks;
+};
+
+struct BlockMap *NewBlockMap(unsigned int width, unsigned int height)
+{
+    struct BlockMap *blockMap = malloc(sizeof(struct BlockMap));
+
+    blockMap->width = width;
+    blockMap->height = height;
+    unsigned int area = width * height;
+    blockMap->area = area;
+
+    blockMap->x = 0;
+    blockMap->y = 0;
+    blockMap->rotation = 0;
+
+    enum PieceType *blocks = malloc(area * sizeof(enum PieceType));
+    // Fill with default value
+    for(int i = 0; i < area; i++)
+    {
+        blocks[i] = n;
+    }
+    blockMap->blocks = blocks;
+
+    return blockMap;
+}
+
+struct BlockMap *NewBlockMapFrom(unsigned int width, unsigned int height, enum PieceType *blocks)
+{
+    struct BlockMap *blockMap = malloc(sizeof(struct BlockMap));
+
+    blockMap->width = width;
+    blockMap->height = height;
+    unsigned int area = width * height;
+    blockMap->area = area;
+
+    blockMap->x = 0;
+    blockMap->y = 0;
+    blockMap->rotation = 0;
+
+    enum PieceType *newBlocks = malloc(area * sizeof(enum PieceType));
+    // Copy
+    for(int i = 0; i < area; i++)
+    {
+        newBlocks[i] = blocks[i];
+    }
+    blockMap->blocks = newBlocks;
+
+    return blockMap;
+}
+
+void DestroyBlockMap(struct BlockMap *blockMap)
+{
+    free(blockMap->blocks);
+    free(blockMap);
+}
+
 int FindDigits(unsigned char x)
 {
     if(x < 10) return 1;
@@ -105,92 +237,137 @@ int FindDigits(unsigned char x)
     return 3;
 }
 
-struct String *GenerateColorCode(unsigned char *color)
+struct String *GenerateColorCode(unsigned char *codes, int count)
 {
-    /*int digits = 0;
+    int digits = 0;
     
-    int i = 0;
-    for(; color[i] != 0; i++)
+    for(int i = 0; i < count; i++)
     {
-        digits += FindDigits(color[i]);
+        digits += FindDigits(codes[i]);
     }
 
-    sprintf(str, "%d", 42);
-    struct String *colorString = NewStringAllocate(3 + digits + i - 2);
+    struct String *colorString = NewStringAllocate(
+        2 
+        + digits 
+        + count-1
+        + 1
+    );
 
-    ConcatChars(colorString, "\x1b[", 3);
-    ConcatChars();
+    ConcatChars(colorString, "\x1b[", 2);
+    for(int i = 0; i < count; i++)
+    {
+        colorString->length = sprintf(colorString->chars, "%s%d", colorString->chars, codes[i]);
+        if(i != count - 1)
+        {
+            ConcatChar(colorString, ';');
+        }
+    }
+    ConcatChar(colorString, 'm');
 
-    struct String *colorString = NewStringFrom("\x1b[m", 3);
-
-    //for(int i = 0; )
-    int numLength = snprintf(NULL, 0, "%d", color);
-    int stringLength = numLength + 3 + 1;
-
-    char *colorString = malloc(stringLength);
-    snprintf(colorString, stringLength, "\x1b[%dm", color);
-
-    return NewStringFrom(colorString, stringLength - 1);*/
+    return colorString;
 }
 
-struct String *DrawToString(char *charBuffer, unsigned char *colorBuffer, int bufferWidth, int bufferHeight)
+struct String *DrawBufferToString(struct Buffer *buffer)
 {
-    int bufferSize = (bufferWidth * bufferHeight) + bufferHeight - 1;
-    struct String *buffer = NewStringAllocate(bufferSize);
+    int stringSize = buffer->area + buffer->height - 1;
+    struct String *string = NewStringAllocate(stringSize);
 
-    Concat(buffer, GenerateColorCode(0));
+    Concat(string, GenerateColorCode( &(unsigned char) {0}, 1 ));
 
     unsigned char lastColor = 0;
-    for(int i = 0; i < bufferWidth * bufferHeight; i++)
+    for(int i = 0; i < buffer->area; i++)
     {
-        if(i % bufferWidth == 0 and i != 0 and i != bufferWidth * bufferHeight - 1)
+        if(i % buffer->width == 0 and i != 0 and i != buffer->area - 1)
         {
-            ConcatChar(buffer, '\n');
+            ConcatChar(string, '\n');
         }
 
-        unsigned char newColor = colorBuffer[i];
+        unsigned char newColor = buffer->codeBuffer[i][0];
 
         if(newColor != lastColor)
         {
-            struct String *color = GenerateColorCode(newColor);
-            Concat(buffer, color);
-
-            free(color);
+            struct String *color = GenerateColorCode( &(unsigned char) {newColor}, 1 );
+            Concat(string, color);
+            DestroyString(color);
             lastColor = newColor;
         }
 
-        ConcatChar(buffer, charBuffer[i]);
+        ConcatChar(string, buffer->chars[i]);
     }
 
-    Concat(buffer, GenerateColorCode(0));
+    Concat(string, GenerateColorCode( &(unsigned char) {0}, 1 ));
 
-    return buffer;
+    return string;
 }
 
-void DrawBlocksToBuffers(enum PieceType *blocks, char *charBuffer, unsigned char *colorBuffer, int blockWidth, int blockHeight, int width, int height, int x, int y)
+int RotateIndex(int i, int width, int height, int rotation)
 {
-    for(int localIndex = 0; localIndex < width * height; localIndex++)
+    if(rotation == 0) return i;
+
+    if(rotation == 1)
     {
-        int bufferIndex = (localIndex / width) * blockWidth;
-        bufferIndex += localIndex % width;
-        bufferIndex += y * blockWidth + x;
+        int new = width - (i / width) - 1;
+        new += width * (i % width);
+        return new;
+    }
+    if(rotation == 2)
+    {
+        int new = width - (i % width) - 1;
+        new += (width - (i / width) - 1) * width;
+        return new;
+    }
+    if(rotation == 3)
+    {
+        int new = (height - (i % width) - 1) * width;
+        new += i / width;
+        return new;
+    }
+}
+
+/*
+0 1 2
+3 4 5
+6 7 8
+
+6 3 0
+7 4 1
+8 5 2
+
+8 7 6
+5 4 3
+2 1 0
+*/
+
+void DrawBlockMapToBuffer(struct BlockMap *blockMap, struct Buffer *buffer)
+{
+    int blockWidth = buffer->width / 2;
+
+    for(int i = 0; i < blockMap->area; i++)
+    {
+        int localIndex = RotateIndex(i, blockMap->width, blockMap->height, blockMap->rotation);
+        if(blockMap->rotation != 0)
+            printf("%d->%d\n", i, localIndex);
+
+        int bufferIndex = (localIndex / blockMap->width) * blockWidth;
+        bufferIndex += localIndex % blockMap->width;
+        bufferIndex += blockMap->y * blockWidth + blockMap->x;
 
         int a = bufferIndex*2;
         int b = bufferIndex*2 + 1;
-        
-        if(blocks[localIndex] == n)
+
+        if(blockMap->blocks[i] == n)
         {
-            charBuffer[a] = '(';
-            charBuffer[b] = ')';
+            buffer->chars[a] = '(';
+            buffer->chars[b] = ')';
         }
         else
         {
-            charBuffer[a] = '[';
-            charBuffer[b] = ']';
+            buffer->chars[a] = '[';
+            buffer->chars[b] = ']';
         }
 
         unsigned char color = 0;
-        switch(blocks[localIndex])
+        switch(blockMap->blocks[i])
         {
             case n: color = 90; break;
             case I: color = 96; break;
@@ -202,10 +379,11 @@ void DrawBlocksToBuffers(enum PieceType *blocks, char *charBuffer, unsigned char
             case L: color = 33; break;
         }
 
-        colorBuffer[a] = color;
-        colorBuffer[b] = color;
+        buffer->codeBuffer[a][0] = color;
+        buffer->codeBuffer[b][0] = color;
     }
 }
+
 
 /*struct ThreadChar
 {
@@ -224,56 +402,53 @@ DWORD WINAPI Update(LPVOID lpParam)
     
 }*/
 
+
+
 int main()
-{
-    char str[] = "abcdef";
-    sprintf(str, "%d", 42);
-    
-    printf("%s", str);
+{   
+    struct BlockMap *board = NewBlockMap(10, 20);
 
-    return 0;
-    int width = 10;
-    int height = 10;
-    int area = width * height;
-    
-    enum PieceType *board = malloc(area * sizeof(enum PieceType));
-    for(int block = 0; block < area; block++) board[block] = n;
+    struct Buffer *displayBuffer = NewBuffer(20, 20);
 
-
-    int bufferWidth = width * 2;
-    int bufferHeight = height;
-    int bufferArea = bufferWidth * bufferHeight;
-
-    char *charBuffer = calloc(bufferArea, sizeof(char));
-    for(int i = 0; i < bufferArea; i++) charBuffer[i] = 'A';
-
-    unsigned char *colorBuffer = malloc(bufferArea * sizeof(unsigned char));
-    for(int color = 0; color < bufferArea; color++) colorBuffer[color] = 90;
-
-    enum PieceType test[9] = {
+    enum PieceType tPiece[9] = {
         n, T, n,
         T, T, T,
         n, n, n
     };
 
-    enum PieceType test2[9] = {
+    enum PieceType lPiece[9] = {
         n, L, n,
         n, L, n,
         n, L, L
     };
 
-    int testX = 0;
-    int testY = 0;
+    struct BlockMap *a = NewBlockMapFrom(3, 3, tPiece);
+    a->rotation = 0; a->y = 0;
+    struct BlockMap *b = NewBlockMapFrom(3, 3, tPiece);
+    b->rotation = 1; b->y = 3;
+    struct BlockMap *c = NewBlockMapFrom(3, 3, tPiece);
+    c->rotation = 2; c->y = 6;
+    struct BlockMap *d = NewBlockMapFrom(3, 3, tPiece);
+    d->rotation = 3; d->y = 9;
 
 
-    DrawBlocksToBuffers(board, charBuffer, colorBuffer, width, height, width, height, 0, 0);
-    DrawBlocksToBuffers(test, charBuffer, colorBuffer, width, height, 3, 3, testX, testY);
-    DrawBlocksToBuffers(test2, charBuffer, colorBuffer, width, height, 3, 3, 5, 5);
+    struct BlockMap *test2 = NewBlockMapFrom(3, 3, lPiece);
+    test2->x = test2->y = 5;
 
-    struct String *uh = DrawToString(charBuffer, colorBuffer, bufferWidth, bufferHeight);
+    DrawBlockMapToBuffer(board, displayBuffer);
+
+    DrawBlockMapToBuffer(a, displayBuffer);
+    DrawBlockMapToBuffer(b, displayBuffer);
+    DrawBlockMapToBuffer(c, displayBuffer);
+    DrawBlockMapToBuffer(d, displayBuffer);
+
+    
+    DrawBlockMapToBuffer(test2, displayBuffer);
+
+    struct String *out = DrawBufferToString(displayBuffer);
 
     //printf("\e[1;1H\e[2J");
-    printf("%s", uh->chars);
+    printf("%s", out->chars);
 
     return 0;
 }
