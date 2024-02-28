@@ -383,20 +383,147 @@ void OverlayBlockMap(struct BlockMap *dest, struct BlockMap *source)
     }
 }
 
+struct DictionaryBucket
+{
+    void *key;
+    unsigned int hash;
+    void *value;
+};
+
+struct Dictionary
+{
+    struct DictionaryBucket *buckets;
+    unsigned int capacity;
+    unsigned int used;
+};
+
+struct Dictionary *NewDictionaryAllocate(unsigned int capacity)
+{
+    struct Dictionary *dict = malloc(sizeof(struct Dictionary));
+    dict->buckets = calloc(capacity, sizeof(struct DictionaryBucket));
+    dict->capacity = capacity;
+    dict->used = 0;
+}
+
+struct Dictionary *NewDictionary()
+{
+    return NewDictionaryAllocate(16);
+}
+
+void DictAdd(struct Dictionary *dict, void *key, unsigned int hash, void *value)
+{
+    unsigned int index = hash % dict->capacity;
+
+    if(dict->buckets[index].hash != 0)
+    {
+        printf("collision: %c (%d)@i%d\n", *(char*)dict->buckets[index].key, dict->buckets[index].hash, index);
+        printf("attempt:   %c (%d)\n", *(char*)key, hash);
+    }
+    else
+    {
+        dict->buckets[index].key = key;
+        dict->buckets[index].hash = hash;
+        dict->buckets[index].value = value;
+        dict->used++;
+    }
+}
+
+void DictRemove(struct Dictionary *dict, unsigned int hash)
+{
+    unsigned int index = hash % dict->capacity;
+    dict->buckets[index].value = 0;
+}
+
+void *DictGet(struct Dictionary *dict, unsigned int hash)
+{
+    unsigned int index = hash % dict->capacity;
+    return dict->buckets[index].value;
+}
+
+unsigned char DictContainsKey(struct Dictionary *dict, unsigned int hash)
+{
+    unsigned int index = hash % dict->capacity;
+    return dict->buckets[index].value != 0;
+}
+
+unsigned int Hash(void *item, int size)
+{
+    char *p = (char*)item;
+
+    unsigned int hash = 0;
+    for(int i = 0; i < size; i++)
+    {
+        hash += p[i] * 31;
+    }
+
+    return hash;
+}
+
+unsigned int HashInt(int item) { return Hash(&item, sizeof(int)); }
+unsigned int HashChar(char item) { return Hash(&item, sizeof(char)); }
+
+enum Controls
+{
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN
+};
+
 struct InputAxis
 {
-    char button;
     unsigned char isPressed;
-    double lastPressed;
+    double timeLastPressed;
 };
+
+struct Controller
+{
+    struct Dictionary *keybinds; // char: int
+    struct Dictionary *axes; // int: inputAxis
+
+    struct InputAxis *inputAxes;
+};
+
+struct Controller *NewController(char *keys, int *codes, int count)
+{
+    struct Controller *controller = malloc(sizeof(struct Controller));
+
+    struct Dictionary *keybinds = NewDictionaryAllocate(count);
+    struct Dictionary *axes = NewDictionaryAllocate(count);
+    struct InputAxis *inputAxes = calloc(count, sizeof(struct InputAxis));
+    for(int i = 0; i < count; i++)
+    {
+        DictAdd(keybinds, keys + i, HashChar(keys[i]), codes + i);
+        DictAdd(axes, codes + i, HashInt(codes[i]), inputAxes + i);
+    }
+
+    controller->keybinds = keybinds;
+    controller->axes = axes;
+    controller->inputAxes = inputAxes;
+
+    return controller;
+}
 
 HANDLE standardInputHandle;
 INPUT_RECORD inputBuffer[32];
+
+double GetTime()
+{
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+
+    return (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
+}
 
 void WindowsInputInit()
 {
     standardInputHandle = GetStdHandle(STD_INPUT_HANDLE);
     SetConsoleMode(standardInputHandle, ENABLE_WINDOW_INPUT);
+}
+
+void WindowsKeyEvent(KEY_EVENT_RECORD keyEvent)
+{
+    
 }
 
 void WindowsInput()
@@ -405,15 +532,17 @@ void WindowsInput()
     ReadConsoleInput(
         standardInputHandle,    // input buffer handle
         inputBuffer,            // buffer to read into
-        32,                    // size of read buffer
+        32,                     // size of read buffer
         &recordCount            // number of records read
     );
+
+    double now = GetTime();
 
     for (int i = 0; i < recordCount; i++)
     {
         if(inputBuffer[i].EventType == KEY_EVENT)
         {
-
+            WindowsKeyEvent(inputBuffer[i].Event.KeyEvent);
         }
         else if(inputBuffer[i].EventType == WINDOW_BUFFER_SIZE_EVENT)
         {
@@ -423,21 +552,45 @@ void WindowsInput()
 }
 
 int main()
-{   
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
+{
+    char defaultKeys[4] = { 'w', 'a', 's', 'd' };
+    int codes[4] = { UP, LEFT, DOWN, RIGHT };
+    struct Controller *controller = NewController(defaultKeys, codes, 4);
 
-    double now = (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
+    struct InputAxis *axis = DictGet(controller->axes, HashInt(DOWN));
 
-    printf("%d %d\n", ts.tv_sec, ts.tv_nsec);
-    printf("%f\n", now);
-    
+    for(int i = 0; i < controller->keybinds->capacity; i++)
+    {
+        char *k = (char*)controller->keybinds->buckets[i].key;
+        int *v = (int*)controller->keybinds->buckets[i].value;
+        int h = controller->keybinds->buckets[i].hash;
+
+        char ko;
+        if(k == 0)
+            ko = '0';
+        else
+            ko = *k;
+
+        int vo;
+        if(v == 0)
+            vo = 0;
+        else
+            vo = *v;
+
+        printf("%c (%d): %d\n", ko, h, vo);
+    }
+
     return 0;
-    
     WindowsInputInit();
 
-    struct BlockMap *board = NewBlockMap(10, 10);
+    /*struct Dictionary *inputAxes = NewDictionaryAllocate(4);
+    DictAdd(inputAxes, HashInt(LEFT), 'a');
+    DictAdd(inputAxes, HashInt(RIGHT), 'd');
+    DictAdd(inputAxes, HashInt(UP), 'w');
+    DictAdd(inputAxes, HashInt(DOWN), 's');*/
+    return 0;
 
+    struct BlockMap *board = NewBlockMap(10, 10);
     struct Buffer *displayBuffer = NewBuffer(20, 10);
 
     enum PieceType tPiece[9] = {
