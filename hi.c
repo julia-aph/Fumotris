@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <windows.h>
 #include <iso646.h>
+#include <time.h>
 
 struct String
 {
@@ -322,12 +323,12 @@ void DrawBlockMapToBuffer(struct BlockMap *blockMap, struct Buffer *buffer)
 {
     int blockWidth = buffer->width / 2;
 
-    for(int index = 0; index < blockMap->area; index++)
+    for(int i = 0; i < blockMap->area; i++)
     {
-        int mapIndex = RotateIndex(index, blockMap->width, blockMap->height, blockMap->rotation);
+        int mapIndex = RotateIndex(i, blockMap->width, blockMap->height, blockMap->rotation);
         int bufferIndex = 
-            index / blockMap->width * blockWidth
-            + index % blockMap->width
+            i / blockMap->width * blockWidth
+            + i % blockMap->width
             + blockMap->y * blockWidth
             + blockMap->x;
 
@@ -335,10 +336,15 @@ void DrawBlockMapToBuffer(struct BlockMap *blockMap, struct Buffer *buffer)
         int b = bufferIndex * 2 + 1;
 
         if(blockMap->blocks[mapIndex] == n)
-            return;
-        
-        buffer->chars[a] = '[';
-        buffer->chars[b] = ']';
+        {
+            buffer->chars[a] = '(';
+            buffer->chars[b] = ')';
+        }
+        else
+        {
+            buffer->chars[a] = '[';
+            buffer->chars[b] = ']';
+        }
 
         unsigned char color = 0;
         switch(blockMap->blocks[mapIndex])
@@ -358,31 +364,81 @@ void DrawBlockMapToBuffer(struct BlockMap *blockMap, struct Buffer *buffer)
     }
 }
 
-
-/*struct ThreadChar
+void OverlayBlockMap(struct BlockMap *dest, struct BlockMap *source)
 {
-    char ch;
-    unsigned char isRead;
-    HANDLE mutex;
-};
+    for(int i = 0; i < source->area; i++)
+    {
+        int sourceIndex = RotateIndex(i, source->width, source->height, source->rotation);
 
-DWORD WINAPI InputThread(LPVOID lpParam)
-{
+        if(source->blocks[sourceIndex] == n)
+            continue;
 
+        int destIndex = 
+            i / source->width * dest->width
+            + i % source->width
+            + source->y * dest->width
+            + source->x;
+
+        dest->blocks[destIndex] = source->blocks[sourceIndex];
+    }
 }
 
-DWORD WINAPI Update(LPVOID lpParam)
+struct InputAxis
 {
-    
-}*/
+    char button;
+    unsigned char isPressed;
+    double lastPressed;
+};
 
+HANDLE standardInputHandle;
+INPUT_RECORD inputBuffer[32];
 
+void WindowsInputInit()
+{
+    standardInputHandle = GetStdHandle(STD_INPUT_HANDLE);
+    SetConsoleMode(standardInputHandle, ENABLE_WINDOW_INPUT);
+}
+
+void WindowsInput()
+{
+    DWORD recordCount;
+    ReadConsoleInput(
+        standardInputHandle,    // input buffer handle
+        inputBuffer,            // buffer to read into
+        32,                    // size of read buffer
+        &recordCount            // number of records read
+    );
+
+    for (int i = 0; i < recordCount; i++)
+    {
+        if(inputBuffer[i].EventType == KEY_EVENT)
+        {
+
+        }
+        else if(inputBuffer[i].EventType == WINDOW_BUFFER_SIZE_EVENT)
+        {
+
+        }
+    }
+}
 
 int main()
 {   
-    struct BlockMap *board = NewBlockMap(10, 20);
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
 
-    struct Buffer *displayBuffer = NewBuffer(20, 20);
+    double now = (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
+
+    printf("%d %d\n", ts.tv_sec, ts.tv_nsec);
+    printf("%f\n", now);
+    
+    return 0;
+    
+    WindowsInputInit();
+
+    struct BlockMap *board = NewBlockMap(10, 10);
+
+    struct Buffer *displayBuffer = NewBuffer(20, 10);
 
     enum PieceType tPiece[9] = {
         n, T, n,
@@ -398,31 +454,17 @@ int main()
 
     struct BlockMap *a = NewBlockMapFrom(3, 3, tPiece);
     a->rotation = 0; a->y = 0;
-    struct BlockMap *b = NewBlockMapFrom(3, 3, tPiece);
-    b->rotation = 1; b->y = 3;
-    struct BlockMap *c = NewBlockMapFrom(3, 3, tPiece);
-    c->rotation = 2; c->y = 6;
-    struct BlockMap *d = NewBlockMapFrom(3, 3, tPiece);
-    d->rotation = 3; d->y = 9;
 
 
-    struct BlockMap *test2 = NewBlockMapFrom(3, 3, lPiece);
-    test2->x = test2->y = 5;
+    while(1)
+    {
+        DrawBlockMapToBuffer(board, displayBuffer);
+        DrawBlockMapToBuffer(a, displayBuffer);
+        struct String *out = DrawBufferToString(displayBuffer);
 
-    DrawBlockMapToBuffer(board, displayBuffer);
-
-    DrawBlockMapToBuffer(a, displayBuffer);
-    DrawBlockMapToBuffer(b, displayBuffer);
-    DrawBlockMapToBuffer(c, displayBuffer);
-    DrawBlockMapToBuffer(d, displayBuffer);
-
-    
-    DrawBlockMapToBuffer(test2, displayBuffer);
-
-    struct String *out = DrawBufferToString(displayBuffer);
-
-    //printf("\e[1;1H\e[2J");
-    printf("%s", out->chars);
+        printf("\e[1;1H\e[2J");
+        puts(out->chars);
+    }
 
     return 0;
 }

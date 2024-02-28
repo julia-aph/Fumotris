@@ -91,6 +91,10 @@ int main(VOID)
     return 0;
 }
 
+void FocusE(FOCUS_EVENT_RECORD focusEvent)
+{
+    printf("Focus event: %d", focusEvent.bSetFocus);
+}
 
 VOID KeyEventProc(KEY_EVENT_RECORD ker)
 {
