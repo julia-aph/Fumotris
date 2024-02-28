@@ -304,70 +304,44 @@ int RotateIndex(int i, int width, int height, int rotation)
 {
     if(rotation == 0) return i;
 
-    if(rotation == 1)
+    int row = i / width;
+    int col = i % width;
+    
+    switch(rotation)
     {
-        int new = width - (i / width) - 1;
-        new += width * (i % width);
-        return new;
-    }
-    if(rotation == 2)
-    {
-        int new = width - (i % width) - 1;
-        new += (width - (i / width) - 1) * width;
-        return new;
-    }
-    if(rotation == 3)
-    {
-        int new = (height - (i % width) - 1) * width;
-        new += i / width;
-        return new;
+        case 1:
+            return (width - col - 1) * height + row;
+        case 2:
+            return (height - row - 1) * width + (width - col - 1);
+        case 3:
+            return col * height + (height - row - 1);
     }
 }
-
-/*
-0 1 2
-3 4 5
-6 7 8
-
-6 3 0
-7 4 1
-8 5 2
-
-8 7 6
-5 4 3
-2 1 0
-*/
 
 void DrawBlockMapToBuffer(struct BlockMap *blockMap, struct Buffer *buffer)
 {
     int blockWidth = buffer->width / 2;
 
-    for(int i = 0; i < blockMap->area; i++)
+    for(int index = 0; index < blockMap->area; index++)
     {
-        int localIndex = RotateIndex(i, blockMap->width, blockMap->height, blockMap->rotation);
-        if(blockMap->rotation != 0)
-            printf("%d->%d\n", i, localIndex);
+        int mapIndex = RotateIndex(index, blockMap->width, blockMap->height, blockMap->rotation);
+        int bufferIndex = 
+            index / blockMap->width * blockWidth
+            + index % blockMap->width
+            + blockMap->y * blockWidth
+            + blockMap->x;
 
-        int bufferIndex = (localIndex / blockMap->width) * blockWidth;
-        bufferIndex += localIndex % blockMap->width;
-        bufferIndex += blockMap->y * blockWidth + blockMap->x;
+        int a = bufferIndex * 2;
+        int b = bufferIndex * 2 + 1;
 
-        int a = bufferIndex*2;
-        int b = bufferIndex*2 + 1;
-
-        if(blockMap->blocks[i] == n)
-        {
-            buffer->chars[a] = '(';
-            buffer->chars[b] = ')';
-        }
-        else
-        {
-            buffer->chars[a] = '[';
-            buffer->chars[b] = ']';
-        }
+        if(blockMap->blocks[mapIndex] == n)
+            return;
+        
+        buffer->chars[a] = '[';
+        buffer->chars[b] = ']';
 
         unsigned char color = 0;
-        switch(blockMap->blocks[i])
+        switch(blockMap->blocks[mapIndex])
         {
             case n: color = 90; break;
             case I: color = 96; break;
