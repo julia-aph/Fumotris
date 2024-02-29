@@ -19,7 +19,7 @@ void Copy(char *dest, char *source, int size)
     }
 }
 
-struct String *NewStringFrom(char *chars, int length)
+struct String *NewStringCopy(char *chars, int length)
 {
     struct String *string = malloc(sizeof(struct String));
     
@@ -31,6 +31,15 @@ struct String *NewStringFrom(char *chars, int length)
     string->allocated = length + 1;
 
     return string;
+}
+
+struct String *NewStringFrom(char *chars, int length)
+{
+    struct String *string = malloc(sizeof(struct String));
+
+    string->chars = chars;
+    string->length = length;
+    string->allocated = length + 1;
 }
 
 struct String *NewStringAllocate(int size)
@@ -214,13 +223,7 @@ struct BlockMap *NewBlockMapFrom(unsigned int width, unsigned int height, enum P
     blockMap->y = 0;
     blockMap->rotation = 0;
 
-    enum PieceType *newBlocks = malloc(area * sizeof(enum PieceType));
-    // Copy
-    for(int i = 0; i < area; i++)
-    {
-        newBlocks[i] = blocks[i];
-    }
-    blockMap->blocks = newBlocks;
+    blockMap->blocks = blocks;
 
     return blockMap;
 }
@@ -273,7 +276,7 @@ struct String *DrawBufferToString(struct Buffer *buffer)
     int stringSize = buffer->area + buffer->height - 1;
     struct String *string = NewStringAllocate(stringSize);
 
-    ConcatChars(string, "\x1b[1;1H\x1b[2J", 10);
+    ConcatChars(string, "\x1b[H", 3);
     Concat(string, GenerateColorCode( &(unsigned char) {0}, 1 ));
 
     unsigned char lastColor = 0;
@@ -338,16 +341,21 @@ int RotateIndex(int i, int width, int height, int rotation)
 
 void DrawBlockMapToBuffer(struct BlockMap *blockMap, struct Buffer *buffer)
 {
-    int blockWidth = buffer->width / 2;
+    int bufferBlockWidth = buffer->width / 2;
 
     for(int i = 0; i < blockMap->area; i++)
     {
         int mapIndex = RotateIndex(i, blockMap->width, blockMap->height, blockMap->rotation);
         int bufferIndex = 
-            i / blockMap->width * blockWidth
+            i / blockMap->width * bufferBlockWidth
             + i % blockMap->width
-            + blockMap->y * blockWidth
+            + blockMap->y * bufferBlockWidth
             + blockMap->x;
+
+        if(bufferIndex < 0 || bufferIndex >= buffer->area / 2)
+            continue;
+
+        printf("%d ", bufferIndex);
 
         int a = bufferIndex * 2;
         int b = bufferIndex * 2 + 1;
@@ -400,12 +408,6 @@ void OverlayBlockMap(struct BlockMap *dest, struct BlockMap *source)
     }
 }
 
-struct FumotrisGameState
-{
-    struct BlockMap board;
-    struct BlockMap current;
-};
-
 unsigned int Hash(void *item, int size)
 {
     unsigned char* data = (unsigned char*)item;
@@ -422,7 +424,7 @@ unsigned int Hash(void *item, int size)
     return h;
 }
 
-struct DictionaryBucket
+struct dictBucket
 {
     void *key;
     unsigned int hash;
@@ -431,7 +433,7 @@ struct DictionaryBucket
 
 struct Dictionary
 {
-    struct DictionaryBucket *buckets;
+    struct dictBucket *buckets;
     unsigned int capacity;
     unsigned int used;
 
@@ -441,7 +443,7 @@ struct Dictionary
 struct Dictionary *NewDictionaryAllocate(unsigned int capacity, unsigned int keySize)
 {
     struct Dictionary *dict = malloc(sizeof(struct Dictionary));
-    dict->buckets = calloc(capacity, sizeof(struct DictionaryBucket));
+    dict->buckets = calloc(capacity, sizeof(struct dictBucket));
     dict->capacity = capacity;
     dict->used = 0;
 
@@ -477,7 +479,7 @@ void DictAdd(struct Dictionary *dict, void *key, void *value)
     if(probe == -1)
         return; // Dictionary is full
 
-    dict->buckets[probe] = (struct DictionaryBucket){ key, hash, value };
+    dict->buckets[probe] = (struct dictBucket){ key, hash, value };
     dict->used++;
 }
 
@@ -507,6 +509,58 @@ unsigned char DictContainsKey(struct Dictionary *dict, void *key)
 
     int probe = dictLinearProbe(dict, index, hash);
     return probe == -1;
+}
+
+struct LinkedList
+{
+    int valueSize;
+    void **head;
+    unsigned int length;
+};
+
+struct LinkedList *NewLinkedList(int valueSize)
+{
+    struct LinkedList *list = malloc(sizeof(struct LinkedList));
+
+    list->valueSize = valueSize;
+    list->head = 0;
+    list->length = 0;
+}
+
+void *LinkedListGet(struct LinkedList* list, int index)
+{
+    void **current = list->head;
+
+    for(int i = 0; i < index; i++)
+    {
+        current = *current;
+    }
+
+    return current;
+}
+
+void *newLinkedListNode(struct LinkedList *list, char *value)
+{
+    char *data = calloc(sizeof(void*) + list->valueSize, 1);
+    for(int i = 0; i < list->valueSize; i++)
+    {
+        data[sizeof(void*) + i] = value[i];
+    }
+
+    void **pointer = (void**)data;
+    pointer = 0;
+
+    return data;
+}
+
+void LinkedListAdd(struct LinkedList *list, void *value)
+{
+    if(list->head == 0)
+    {
+        list->head = newLinkedListNode(list, value);
+    }
+
+    
 }
 
 struct InputAxis
@@ -572,18 +626,6 @@ enum Controls
 {
     LEFT,
     RIGHT,
-    UP,
-    DOWN,
-    ROTATE_CCW,
-    ROTATE_CW,
-    ESC
-};
-
-/*
-enum Controls
-{
-    LEFT,
-    RIGHT,
     SOFT_DROP,
     HARD_DROP,
     ROTATE_CCW,
@@ -591,8 +633,7 @@ enum Controls
     ROTATE_180,
     SWAP,
     ESC
-}
-*/
+};
 
 struct Windows
 {
@@ -614,6 +655,8 @@ void WindowsInit(struct Windows *win)
     BOOL consoleModeOk = SetConsoleMode(win->standardInputHandle, ENABLE_WINDOW_INPUT);
     if(!consoleModeOk)
         exit(1);
+
+    system("color");
 }
 
 void WindowsKeyEvent(KEY_EVENT_RECORD keyEvent, double timestamp, struct Controller *controller)
@@ -691,9 +734,37 @@ void *InputThread(void *inputThreadArgs)
     }
 }
 
-void Update()
+struct String *ReadFile(char *path)
 {
+    FILE *file = fopen(path, "r");
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET);
 
+    char *string = malloc(length + 1);
+    fread(string, length, 1, file);
+    fclose(file);
+
+    string[length] = 0;
+
+    return NewStringFrom(string, length);
+}
+
+void ParseJSON()
+{
+    
+}
+
+struct FumotrisGameState
+{
+    struct BlockMap board;
+    struct BlockMap current;
+};
+
+void Run()
+{
+    struct BlockMap *board = NewBlockMap(10, 10);
+    struct Buffer *displayBuffer = NewBuffer(20, 10);
 }
 
 int main()
@@ -731,6 +802,7 @@ int main()
     a->rotation = 0; a->y = 0;
 
 
+    puts("\x1b[2J");
     while(1)
     {
         DrawBlockMapToBuffer(board, displayBuffer);
@@ -739,7 +811,7 @@ int main()
         struct String *out = DrawBufferToString(displayBuffer);
         puts(out->chars);
 
-        WindowsWait(&win, 0.1);
+        WindowsWait(&win, 1.0 / 30);
 
 
         pthread_mutex_lock(&controller->mutex);
@@ -754,11 +826,9 @@ int main()
             a->y++;
 
         if(ControllerAxis(controller, ROTATE_CCW)->isPressed)
-            a->rotation = (a->rotation - 1) % 4;
+            a->rotation = (unsigned char)(a->rotation - 1) % 4;
         if(ControllerAxis(controller, ROTATE_CW)->isPressed)
-            a->rotation = (a->rotation + 1) % 4;
-
-        printf("%d", a->rotation);
+            a->rotation = (unsigned char)(a->rotation + 1) % 4;
 
         if(ControllerAxis(controller, ESC)->isPressed)
             break;

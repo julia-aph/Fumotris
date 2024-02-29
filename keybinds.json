@@ -1,0 +1,11 @@
+{
+    "LEFT": "a",
+    "RIGHT": "d",
+    "SOFT_DROP": "s",
+    "HARD_DROP": " ",
+    "ROTATE_CCW": "q",
+    "ROTATE_CW": "e",
+    "ROTATE_180": "r",
+    "SWAP": "z",
+    "ESC": 27
+}

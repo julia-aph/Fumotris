@@ -1,0 +1,72 @@
+[
+    {
+        "name": "I",
+        "color": [96],
+        "dimensions": [4, 4],
+        "structure": [
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            1, 1, 1, 1,
+            0, 0, 0, 0
+        ]
+    },
+    {
+        "name": "O",
+        "color": [93],
+        "dimensions": [2, 2],
+        "structure": [
+            1, 1,
+            1, 1
+        ]
+    },
+    {
+        "name": "T",
+        "color": [95],
+        "dimensions": [3, 3],
+        "structure": [
+            0, 1, 0,
+            1, 1, 1,
+            0, 0, 0
+        ]
+    },
+    {
+        "name": "S",
+        "color": [92],
+        "dimensions": [3, 3],
+        "structure": [
+            0, 1, 1,
+            1, 1, 0,
+            0, 0, 0
+        ]
+    },
+    {
+        "name": "Z",
+        "color": [91],
+        "dimensions": [3, 3],
+        "structure": [
+            1, 1, 0,
+            0, 1, 1,
+            0, 0, 0
+        ]
+    },
+    {
+        "name": "J",
+        "color": [94],
+        "dimensions": [3, 3],
+        "structure": [
+            1, 0, 0,
+            1, 1, 1,
+            0, 0, 0
+        ]
+    },
+    {
+        "name": "L",
+        "color": [33],
+        "dimensions": [3, 3],
+        "structure": [
+            0, 0, 1,
+            1, 1, 1,
+            0, 0, 0
+        ]
+    }
+]
