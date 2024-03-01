@@ -381,6 +381,101 @@ void OverlayBlockMap(struct BlockMap *dest, struct BlockMap *source)
     }
 }
 
+struct vecHead
+{
+    unsigned int itemSize;
+    unsigned int capacity;
+    unsigned int used;
+};
+
+void *NewVectorAllocate(unsigned int itemSize, unsigned int capacity)
+{
+    void *vec = malloc(sizeof(struct vecHead) + itemSize * capacity);
+
+    struct vecHead *head = (struct vecHead*)vec;
+    *head = (struct vecHead){ itemSize, capacity, 0 };
+
+    return (unsigned char*)vec + sizeof(struct vecHead);
+}
+
+void *NewVector(unsigned int itemSize)
+{
+    return NewVectorAllocate(itemSize, 1);
+}
+
+void vecAdd(void **array, void *item)
+{
+    void *vec = (struct vecHead*)*array - 1;
+    struct vecHead *head = vec;
+
+    if(head->used == head->capacity) // Grow backing array
+    {
+        vec = realloc(vec, sizeof(struct vecHead) + head->capacity * head->itemSize * 2);
+        head = vec;
+        *array = head + 1;
+        head->capacity *= 2;
+    }
+
+    memcpy(*array + head->used * head->itemSize, item, head->itemSize);
+    head->used++;
+}
+
+void VectorAdd(void *arrayPtr, void *item)
+{
+    vecAdd(arrayPtr, item);
+}
+
+void vecTrim(void **array)
+{
+    void *vec = (struct vecHead*)*array - 1;
+    struct vecHead *head = vec;
+    printf("a:%u\n", head->used);
+    vec = realloc(vec, sizeof(struct vecHead) + head->used * head->itemSize);
+    head = vec;
+    *array = head + 1;
+
+    head->capacity = head->used;
+}
+
+void VectorTrim(void *arrayPtr)
+{
+    vecTrim(arrayPtr);
+}
+
+unsigned int VectorCapacity(void *array)
+{
+    struct vecHead *head = (struct vecHead*)array - 1;
+    return head->capacity;
+}
+
+unsigned int VectorLength(void *array)
+{
+    struct vecHead *head = (struct vecHead*)array - 1;
+    return head->used;
+}
+
+int main()
+{
+    char *stuff = NewVector(1);
+
+    char aa[] = "abcde";
+    for(int j = 0; j < 5; j++) 
+    {
+        VectorAdd(&stuff, aa + j);
+    }
+
+    printf("%s\n", stuff);
+    printf("C:%u, U:%u\n", VectorCapacity(stuff), VectorLength(stuff));
+
+    VectorTrim(&stuff);
+
+    printf("%s\n", stuff);
+    printf("C:%u, U:%u\n", VectorCapacity(stuff), VectorLength(stuff));
+
+
+    return 0;
+}
+
 unsigned int Hash(void *item, int size)
 {
     unsigned char* data = (unsigned char*)item;
@@ -609,18 +704,6 @@ struct HashSet *NewHashSet(unsigned int itemSize)
     return set;
 }
 
-struct HashSet *NewHashSetFrom(void *items, unsigned int length, unsigned int itemSize)
-{
-    struct HashSet *set = NewHashSet(itemSize);
-    
-    for(int i = 0; i < length; i++)
-    {
-        HashSetAdd(set, items + itemSize * i);
-    }
-
-    return set;
-}
-
 void hashSetLink(struct HashSet *set, void *item, void *bucket, unsigned int hash)
 {
     void *node = malloc(set->bucketSize);
@@ -660,6 +743,18 @@ void HashSetAdd(struct HashSet *set, void *item)
         printf("collision\n");
         hashSetLink(set, item, bucket, hash);
     }
+}
+
+struct HashSet *NewHashSetFrom(void *items, unsigned int length, unsigned int itemSize)
+{
+    struct HashSet *set = NewHashSet(itemSize);
+    
+    for(int i = 0; i < length; i++)
+    {
+        HashSetAdd(set, items + itemSize * i);
+    }
+
+    return set;
 }
 
 unsigned char HashSetContains(struct HashSet *set, void *item)
@@ -873,41 +968,32 @@ struct String *ReadTextFile(char *path)
     return NewStringFrom(string, length);
 }
 
-enum JSONContext
+enum JSONType
 {
-    START,
-    STRING,
-    NUMBER,
-    BOOLEAN,
     OBJECT,
-    OBJECT_KEY,
-    OBJECT_VAL,
     ARRAY,
-    JSON_NULL,
-    COMMA,
-    COLON
+    STRING,
+    PRIMITIVE
 };
 
-void ParseJSON(struct String *raw)
+struct JSONToken
 {
-    enum JSONContext mode = START;
+    enum JSONType type;
+    unsigned int start;
+    unsigned int length;
 
-    for(int i = 0; i < raw->length; i++)
+    unsigned int parent;
+};
+
+/*void ParseJSON(char *string)
+{
+    enum JSONType mode = ARRAY;
+
+    for(; *string != 0; string++)
     {
-        char ch = raw->chars[i];
-
-        switch(mode)
-        {
-            case START: 
-        }
-
-        switch(ch)
-        {
-            case '{': mode = OBJECT; continue;
-            case '[': mode = ARRAY; continue;
-        }
+        switch()
     }
-}
+}*/
 
 struct FumotrisGameState
 {
