@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <pthread.h>
 #include <windows.h>
@@ -11,26 +12,18 @@ struct String
     unsigned int allocated;
 };
 
-void Copy(char *dest, char *source, int size)
-{
-    for(int i = 0; i < size; i++)
-    {
-        dest[i] = source[i];
-    }
-}
-
 struct String *NewStringCopy(char *chars, int length)
 {
-    struct String *string = malloc(sizeof(struct String));
+    struct String *str = malloc(sizeof(struct String));
     
-    string->chars = malloc(length + 1 * sizeof(char));
-    Copy(string->chars, chars, length);
-    string->chars[length] = 0;
+    str->chars = malloc(length + 1 * sizeof(char));
+    memcpy(str, chars, length);
+    str->chars[length] = 0;
     
-    string->length = length;
-    string->allocated = length + 1;
+    str->length = length;
+    str->allocated = length + 1;
 
-    return string;
+    return str;
 }
 
 struct String *NewStringFrom(char *chars, int length)
@@ -73,7 +66,7 @@ void ConcatChars(struct String *dest, char *chars, int length)
         dest->allocated = newSize;
     }
 
-    Copy(dest->chars + dest->length, chars, length);
+    memcpy(dest->chars + dest->length, chars, length);
     dest->chars[newLength] = 0;
     dest->length = newLength;
 }
@@ -99,8 +92,8 @@ void Insert(struct String *dest, char *chars, int length, int at)
         dest->allocated = newSize;
     }
 
-    Copy(dest->chars + at + length, dest->chars + at, dest->length - at);
-    Copy(dest->chars + at, chars, length);
+    memcpy(dest->chars + at + length, dest->chars + at, dest->length - at);
+    memcpy(dest->chars + at, chars, length);
     dest->chars[newLength] = 0;
     dest->length = newLength;
 }
@@ -160,18 +153,6 @@ void DestroyBuffer(struct Buffer *buffer)
     free(buffer);
 }
 
-enum PieceType
-{
-    n,
-    I,
-    O,
-    T,
-    S,
-    Z,
-    J,
-    L
-};
-
 struct BlockMap
 {
     unsigned int width;
@@ -183,7 +164,7 @@ struct BlockMap
 
     unsigned char rotation;
 
-    enum PieceType *blocks;
+    unsigned char *blocks;
 };
 
 struct BlockMap *NewBlockMap(unsigned int width, unsigned int height)
@@ -199,18 +180,18 @@ struct BlockMap *NewBlockMap(unsigned int width, unsigned int height)
     blockMap->y = 0;
     blockMap->rotation = 0;
 
-    enum PieceType *blocks = malloc(area * sizeof(enum PieceType));
+    unsigned char *blocks = malloc(area * sizeof(unsigned char));
     // Fill with default value
     for(int i = 0; i < area; i++)
     {
-        blocks[i] = n;
+        blocks[i] = 0;
     }
     blockMap->blocks = blocks;
 
     return blockMap;
 }
 
-struct BlockMap *NewBlockMapFrom(unsigned int width, unsigned int height, enum PieceType *blocks)
+struct BlockMap *NewBlockMapFrom(unsigned int width, unsigned int height, unsigned char *blocks)
 {
     struct BlockMap *blockMap = malloc(sizeof(struct BlockMap));
 
@@ -360,7 +341,7 @@ void DrawBlockMapToBuffer(struct BlockMap *blockMap, struct Buffer *buffer)
         int a = bufferIndex * 2;
         int b = bufferIndex * 2 + 1;
 
-        if(blockMap->blocks[mapIndex] == n)
+        if(blockMap->blocks[mapIndex] == 0)
         {
             buffer->chars[a] = '(';
             buffer->chars[b] = ')';
@@ -374,14 +355,6 @@ void DrawBlockMapToBuffer(struct BlockMap *blockMap, struct Buffer *buffer)
         unsigned char color = 0;
         switch(blockMap->blocks[mapIndex])
         {
-            case n: color = 90; break;
-            case I: color = 96; break;
-            case O: color = 93; break;
-            case T: color = 95; break;
-            case S: color = 92; break;
-            case Z: color = 91; break;
-            case J: color = 94; break;
-            case L: color = 33; break;
         }
 
         buffer->codeBuffer[a][0] = color;
@@ -395,7 +368,7 @@ void OverlayBlockMap(struct BlockMap *dest, struct BlockMap *source)
     {
         int sourceIndex = RotateIndex(i, source->width, source->height, source->rotation);
 
-        if(source->blocks[sourceIndex] == n)
+        if(source->blocks[sourceIndex] == 0)
             continue;
 
         int destIndex = 
@@ -525,9 +498,11 @@ struct LinkedList *NewLinkedList(int valueSize)
     list->valueSize = valueSize;
     list->head = 0;
     list->length = 0;
+
+    return list;
 }
 
-void *LinkedListGet(struct LinkedList* list, int index)
+void **linkedListGetNode(struct LinkedList* list, int index)
 {
     void **current = list->head;
 
@@ -539,18 +514,21 @@ void *LinkedListGet(struct LinkedList* list, int index)
     return current;
 }
 
-void *newLinkedListNode(struct LinkedList *list, char *value)
+void **newLinkedListNode(struct LinkedList *list, char *value)
 {
-    char *data = calloc(sizeof(void*) + list->valueSize, 1);
+    char *node = malloc(sizeof(void*) + list->valueSize);
     for(int i = 0; i < list->valueSize; i++)
     {
-        data[sizeof(void*) + i] = value[i];
+        node[sizeof(void*) + i] = value[i];
     }
+    *(void**)node = 0;
 
-    void **pointer = (void**)data;
-    pointer = 0;
+    return (void**)node;
+}
 
-    return data;
+void *LinkedListGet(struct LinkedList *list, int index)
+{
+    return (char*)linkedListGetNode(list, index) + sizeof(void*);
 }
 
 void LinkedListAdd(struct LinkedList *list, void *value)
@@ -559,8 +537,153 @@ void LinkedListAdd(struct LinkedList *list, void *value)
     {
         list->head = newLinkedListNode(list, value);
     }
+    else
+    {
+        void **parentNode = linkedListGetNode(list, list->length-1);
+        *parentNode = newLinkedListNode(list, value);
+    }
+    list->length++;
+}
 
+void LinkedListInsert(struct LinkedList *list, void *value, int index)
+{
+    void **newNode = newLinkedListNode(list, value);
+
+    if(index == 0)
+    {
+        *newNode = list->head;
+        list->head = newNode;
+    }
+    else
+    {
+        void **parentNode = linkedListGetNode(list, index-1);
+        *newNode = *parentNode;
+        *parentNode = newNode;
+    }
+    list->length++;
+}
+
+void LinkedListRemove(struct LinkedList *list, int index)
+{
+    if(index == 0)
+    {
+        void **newHeadNode = *list->head;
+        free(list->head);
+        list->head = newHeadNode;
+    }
+    else
+    {
+        void **parentNode = linkedListGetNode(list, index-1);
+        void **targetNode = (void**)*parentNode;
+        *parentNode = *targetNode;
+        free(targetNode);
+    }
+    list->length--;
+}
+
+struct HashSet
+{
+    unsigned int bucketSize;
+    unsigned int itemSize;
+    unsigned int linkOffset;
+
+    unsigned int capacity;
+    unsigned int used;
+
+    // unsigned int: hash, itemSize: item, void *: link
+    void *buckets;
+};
+
+struct HashSet *NewHashSet(unsigned int itemSize)
+{
+    struct HashSet *set = malloc(sizeof(struct HashSet));
+
+    set->bucketSize = sizeof(unsigned int) + itemSize + sizeof(void*);
+    set->itemSize = itemSize;
+    set->linkOffset = sizeof(unsigned int) + set->itemSize;
+
+    set->capacity = 16;
+    set->used = 0;
+    set->buckets = calloc(set->capacity, set->bucketSize);
+
+    return set;
+}
+
+struct HashSet *NewHashSetFrom(void *items, unsigned int length, unsigned int itemSize)
+{
+    struct HashSet *set = NewHashSet(itemSize);
     
+    for(int i = 0; i < length; i++)
+    {
+        HashSetAdd(set, items + itemSize * i);
+    }
+
+    return set;
+}
+
+void hashSetLink(struct HashSet *set, void *item, void *bucket, unsigned int hash)
+{
+    void *node = malloc(set->bucketSize);
+    
+    void **next = bucket + set->linkOffset;
+    while(*next != 0)
+    {
+        next = *next + set->linkOffset;
+    }
+    *next = node;
+
+    *(unsigned int*)node = hash;
+    memcpy(node + sizeof(unsigned int), item, set->itemSize);
+    void **link = node + set->linkOffset;
+    *link = 0;
+}
+
+void HashSetAdd(struct HashSet *set, void *item)
+{
+    unsigned int hash = Hash(item, set->itemSize);
+    printf("H: %u, %%: %u\n", hash, hash % set->capacity);
+    unsigned int index = hash % set->capacity;
+
+    void *bucket = set->buckets + set->bucketSize * index;
+    unsigned int *bucketHash = bucket;
+
+    if(hash == *bucketHash) // Might not work 100% of the time depending on the hash function
+        return;
+
+    if(*bucketHash == 0)
+    {
+        *bucketHash = hash;
+        memcpy(bucket + sizeof(unsigned int), item, set->itemSize);
+    }
+    else // Collision
+    {
+        printf("collision\n");
+        hashSetLink(set, item, bucket, hash);
+    }
+}
+
+unsigned char HashSetContains(struct HashSet *set, void *item)
+{
+    unsigned int hash = Hash(item, set->itemSize);
+    unsigned int index = hash % set->capacity;
+
+    void *bucket = set->buckets + set->bucketSize * index;
+    unsigned int bucketHash = *(unsigned int*)bucket;
+
+    if(hash == bucketHash)
+        return 1;
+
+    void **next = bucket + set->linkOffset;
+    while(*next != 0)
+    {
+        unsigned int nodeHash = *(unsigned int*)*next;
+        if(hash == nodeHash)
+            return 1;
+
+        next = *next + set->linkOffset;
+    }
+
+    return 0;
 }
 
 struct InputAxis
@@ -734,7 +857,7 @@ void *InputThread(void *inputThreadArgs)
     }
 }
 
-struct String *ReadFile(char *path)
+struct String *ReadTextFile(char *path)
 {
     FILE *file = fopen(path, "r");
     fseek(file, 0, SEEK_END);
@@ -750,9 +873,40 @@ struct String *ReadFile(char *path)
     return NewStringFrom(string, length);
 }
 
-void ParseJSON()
+enum JSONContext
 {
-    
+    START,
+    STRING,
+    NUMBER,
+    BOOLEAN,
+    OBJECT,
+    OBJECT_KEY,
+    OBJECT_VAL,
+    ARRAY,
+    JSON_NULL,
+    COMMA,
+    COLON
+};
+
+void ParseJSON(struct String *raw)
+{
+    enum JSONContext mode = START;
+
+    for(int i = 0; i < raw->length; i++)
+    {
+        char ch = raw->chars[i];
+
+        switch(mode)
+        {
+            case START: 
+        }
+
+        switch(ch)
+        {
+            case '{': mode = OBJECT; continue;
+            case '[': mode = ARRAY; continue;
+        }
+    }
 }
 
 struct FumotrisGameState
@@ -767,10 +921,10 @@ void Run()
     struct Buffer *displayBuffer = NewBuffer(20, 10);
 }
 
-int main()
+int mains()
 {
     char defaultKeys[7] = { 'a', 'd', 'w', 's', 'q', 'e', 27 };
-    int codes[7] = { LEFT, RIGHT, UP, DOWN, ROTATE_CCW, ROTATE_CW, ESC };
+    int codes[7] = { LEFT, RIGHT, ROTATE_CCW, ROTATE_CW, ESC };
 
     struct Controller *controller = NewController(defaultKeys, codes, 7);
 
@@ -786,23 +940,11 @@ int main()
     struct BlockMap *board = NewBlockMap(10, 10);
     struct Buffer *displayBuffer = NewBuffer(20, 10);
 
-    enum PieceType tPiece[9] = {
-        n, T, n,
-        T, T, T,
-        n, n, n
-    };
-
-    enum PieceType lPiece[9] = {
-        n, L, n,
-        n, L, n,
-        n, L, L
-    };
-
-    struct BlockMap *a = NewBlockMapFrom(3, 3, tPiece);
-    a->rotation = 0; a->y = 0;
+    //struct BlockMap *a = NewBlockMapFrom(3, 3, tPiece);
+    //a->rotation = 0; a->y = 0;
 
 
-    puts("\x1b[2J");
+    /*puts("\x1b[2J");
     while(1)
     {
         DrawBlockMapToBuffer(board, displayBuffer);
@@ -834,7 +976,7 @@ int main()
             break;
 
         pthread_mutex_unlock(&controller->mutex);
-    }
+    }*/
 
     printf("done");
     return 0;
