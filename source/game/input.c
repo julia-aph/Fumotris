@@ -6,8 +6,8 @@
 
 struct InputAxis
 {
-    uint8_t isPressed;
-    double timeLastPressed;
+    uint8_t isDown;
+    double lastDown;
 };
 
 struct Controller

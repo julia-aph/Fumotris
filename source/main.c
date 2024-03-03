@@ -162,49 +162,8 @@ void OverlayBlockMap(struct BlockMap *dest, struct BlockMap *source)
     }
 }
 
-struct InputThreadArgs
-{
-    struct Windows *win;
-    struct Controller *controller;
-};
-
-void *InputThread(void *inputThreadArgs)
-{
-    struct InputThreadArgs *args = inputThreadArgs;
-
-    while(ControllerAxis(args->controller, ESC)->timeLastPressed == 0)
-    {
-        BlockWindowsInput(args->win, args->controller);
-    }
-}
-
-
-
-struct FumotrisGameState
-{
-    struct BlockMap board;
-    struct BlockMap current;
-};
-
-void Run()
-{
-    struct BlockMap *board = NewBlockMap(10, 10);
-    struct Buffer *displayBuffer = NewBuffer(20, 10);
-}
-
 int main()
 {
-    //struct Controller *controller = NewController(defaultKeys, codes, 7);
-
-    struct Windows win = { 0 };
-    WindowsInit(&win);
-
-
-    /*struct InputThreadArgs args = (struct InputThreadArgs){ &win, controller };
-    pthread_t inputThread;
-    pthread_create(&inputThread, NULL, *InputThread, &args);
-    */
-
     struct BlockMap *board = NewBlockMap(10, 10);
     struct Buffer *displayBuffer = NewBuffer(20, 10);
 
@@ -212,39 +171,6 @@ int main()
     char *out = DrawBufferToString(displayBuffer);
 
     puts(out);
-
-    //puts("\x1b[2J");
-
-    /*while(1)
-    {
-        DrawBlockMapToBuffer(a, displayBuffer);
-
-        puts(out->chars);
-
-        WindowsWait(&win, 1.0 / 30);
-
-
-        pthread_mutex_lock(&controller->mutex);
-
-        if(ControllerAxis(controller, LEFT)->isPressed)
-            a->x--;
-        if(ControllerAxis(controller, RIGHT)->isPressed)
-            a->x++;
-        if(ControllerAxis(controller, UP)->isPressed)
-            a->y--;
-        if(ControllerAxis(controller, DOWN)->isPressed)
-            a->y++;
-
-        if(ControllerAxis(controller, ROTATE_CCW)->isPressed)
-            a->rotation = (unsigned char)(a->rotation - 1) % 4;
-        if(ControllerAxis(controller, ROTATE_CW)->isPressed)
-            a->rotation = (unsigned char)(a->rotation + 1) % 4;
-
-        if(ControllerAxis(controller, ESC)->isPressed)
-            break;
-
-        pthread_mutex_unlock(&controller->mutex);
-    }*/
 
     printf("done");
     return 0;

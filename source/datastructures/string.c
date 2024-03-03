@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <time.h>
-#include <pthread.h>
 
 typedef char String;
 
@@ -110,8 +108,9 @@ size_t ConcatStr(String **dest, String *src)
     if(newCapacity > destHead->capacity)
         strRealloc(&destHead, dest, newCapacity);
 
+    memcpy(*dest + destHead->length, src, srcHead->length + 1);
+
     destHead->length = newLength;
-    memcpy(*dest + srcHead->length, src, srcHead->length + 1);
 
     return newLength;
 }
@@ -127,8 +126,9 @@ size_t ConcatChars(String **dest, char *src)
     if(newCapacity > destHead->capacity)
         strRealloc(&destHead, dest, newCapacity);
 
+    memcpy(*dest + destHead->length, src, srcLength + 1);
+
     destHead->length = newLength;
-    memcpy(*dest + srcLength, src, srcLength + 1);
 
     return newLength;
 }
@@ -143,27 +143,35 @@ size_t ConcatChar(String **dest, char ch)
     if(newCapacity > destHead->capacity)
         strRealloc(&destHead, dest, newCapacity);
 
+    (*dest)[newLength-1] = ch;
+    (*dest)[newLength] = 0;
+
     destHead->length = newLength;
-    (*dest)[newLength + 1] = ch;
 
     return newLength;
 }
 
-int main()
+void strDebug(String *string)
 {
-    String *string = NewStringCopy("asdfghjk");
+    strHead *head = getHead(string);
 
-    printf("%s\n", string);
-    printf("length: %u, capacity: %u\n", StrLength(string), StrCapacity(string));
+    uint8_t *object = (uint8_t*)head;
 
-    ConcatStr(&string, NewStringCopy(", wow"));
-    
-    printf("%s\n", string);
-    printf("length: %u, capacity: %u\n", StrLength(string), StrCapacity(string));
+    printf("          ");
+    for(int i = 0; i < sizeof(strHead) + head->capacity; i++)
+    {
+        printf("%u ", i);
+    }
 
-    ConcatChar(&string, '.');
-    printf("%s\n", string);
-    printf("length: %u, capacity: %u\n", StrLength(string), StrCapacity(string));
-
-    return 0;
+    printf("\nstrDebug: ");
+    for(int i = 0; i < sizeof(strHead); i++)
+    {
+        printf("%u_", object[i]);
+    }
+    printf(" ");
+    for(int i = sizeof(strHead); i < sizeof(strHead) + head->capacity; i++)
+    {
+        printf("%u_", object[i]);
+    }
+    printf(".\n");
 }
