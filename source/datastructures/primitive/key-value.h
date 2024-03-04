@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -8,34 +9,28 @@ struct KeyValueSize
     size_t value;
 };
 
-typedef struct KeyValueSize KeyValueSize;
-
 struct KeyValuePtr
 {
     void *key;
     void *value;
 };
 
-typedef struct KeyValuePtr KeyValuePtr;
-
 struct KeyValueResult
 {
     uint8_t success;
-    KeyValuePtr ptrs;
+    struct KeyValuePtr ptrs;
 };
 
-typedef struct KeyValueResult KeyValueResult;
-
-KeyValueResult KeyValueResultSuccess(KeyValuePtr ptrs)
+struct KeyValueResult KeyValueResultSuccess(struct KeyValuePtr ptrs)
 {
-    return (KeyValueResult){
+    return (struct KeyValueResult){
         .success = 1, .ptrs = ptrs
     };
 }
 
-KeyValueResult KeyValueResultFail()
+struct KeyValueResult KeyValueResultFail()
 {
-    return (KeyValueResult){
+    return (struct KeyValueResult){
         .success = 0
     };
 }
