@@ -1,7 +1,9 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
+/* ext code - add to another lib later */
 struct KeyValueSize
 {
     size_t key;
@@ -10,35 +12,57 @@ struct KeyValueSize
 
 typedef struct KeyValueSize KeyValueSize;
 
-void *getKeyValuePtr(KeyValueSize *size, uint8_t node, uint8_t **key, uint8_t **value)
+struct AscLinkedList
 {
-    *key = node + sizeof(void*);
-    *value = node + sizeof(void*) + size->key;
+    struct KeyValueSize size;
+    void *head;
+};
+
+typedef struct AscLinkedList AscLinkedList;
+
+struct KeyValuePtr
+{
+    void *key;
+    void *value;
+};
+
+typedef struct KeyValuePtr KeyValuePtr;
+
+size_t AscLinkedListNodeSize(size_t keySize, size_t valueSize)
+{
+    return sizeof(void*) + keySize + valueSize;
 }
 
-void *NewAscLinkedList(size_t keySize, size_t valueSize)
+AscLinkedList NewAscLinkedList(size_t keySize, size_t valueSize)
 {
-    uint8_t *object = malloc(sizeof(void*) + keySize + valueSize);
+    return (AscLinkedList){
+        .size = (KeyValueSize){
+            .key = keySize, .value = valueSize
+        },
 
-    void *next = object;
-    *(void**)next = 0;
-
-    return object;
+        .head = 0
+    };
 }
 
-uint8_t AscLinkedListAddFirst(KeyValueSize *size, void *node, uint8_t *key, uint8_t *value)
+KeyValuePtr getKeyValuePair(KeyValueSize *size, uint8_t *node)
+{
+    return (KeyValuePtr){
+        .key = node + sizeof(void*),
+        .value = node + sizeof(void*) + size->key
+    };
+}
+
+uint8_t AscLinkedListAddFirstToNode(KeyValueSize *size, void *node, void *key, void *value)
 {
     void *next = *(void**)node;
 
     if(next == 0)
     {
-        uint8_t *currentKey;
-        uint8_t *currentValue;
-        getKeyValuePtr(size, node, &currentKey, &currentValue);
+        KeyValuePtr pair = getKeyValuePair(size, node);
 
         next = node;
-        memcpy(currentKey, key, size->key);
-        memcpy(currentValue, value, size->value);
+        memcpy(pair.key, key, size->key);
+        memcpy(pair.value, value, size->value);
     }
     else if(next == node)
     {
@@ -46,14 +70,60 @@ uint8_t AscLinkedListAddFirst(KeyValueSize *size, void *node, uint8_t *key, uint
 
         uint8_t *node = next;
 
-        uint8_t *currentKey;
-        uint8_t *currentValue;
-        getKeyValuePtr(size, node, &currentKey, &currentValue);
+        KeyValuePtr pair = getKeyValuePair(size, node);
 
         *(void**)node = 0;
-        memcpy(currentKey, key, size->key);
-        memcpy(currentValue, value, size->value);
+        memcpy(pair.key, key, size->key);
+        memcpy(pair.value, value, size->value);
     }
 }
 
-uint8_t 
+uint8_t AscLinkedListAddFirst(AscLinkedList *list, void *key, void *value)
+{
+    if(list->head == 0)
+    {
+        list->head = malloc(AscLinkedListNodeSize(list->size.key, list->size.value));
+    }
+
+    return AscLinkedListAddFirstToNode((KeyValueSize*)list, list->head, key, value);
+}
+
+KeyValuePtr AscLinkedListGetFromNode(KeyValueSize *size, void *node, size_t index)
+{
+    if(index == 0)
+        return getKeyValuePair(size, node);
+
+    void *next;
+
+    for(int i = 0; i < index; i++)
+    {
+        next = *(void**)node;
+
+        if(next == 0)
+            return (KeyValuePtr){ 0, 0 };
+    }
+
+    return getKeyValuePair(size, next);
+}
+
+KeyValuePtr AscLinkedListGet(AscLinkedList *list, size_t index)
+{
+    return AscLinkedListGetFromNode((KeyValueSize*)list, list->head, index);
+}
+
+int main()
+{
+    AscLinkedList list = NewAscLinkedList(1, 1);
+
+    AscLinkedListAddFirst(&list, "a", "1");
+
+    for(int i = 0; i < 20; i++)
+    {
+        printf("%u ", ((char*)list.head)[i]);
+    }
+
+    char *whar = AscLinkedListGet(&list, 0).value;
+
+
+    return 0;
+}
