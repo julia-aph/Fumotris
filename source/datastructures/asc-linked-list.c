@@ -18,6 +18,18 @@ struct AscLinkedList
 };
 typedef struct AscLinkedList AscLinkedList;
 
+Node *new_node(struct KeyValueSize *size);
+
+Node *get_next(Node *node);
+void set_next(Node *node, Node *next);
+
+struct KeyValuePtr get_ptrs(struct KeyValueSize *size, Node *node);
+
+void set_ptrs(struct KeyValueSize *size, struct KeyValuePtr ptrs, void *key, void *value);
+void set_node(struct KeyValueSize *size, void *node, void *key, void *value);
+
+struct KeyValueSize *get_size(AscLinkedList *list);
+
 AscLinkedList NewAssociativeLinkedList(size_t key_size, size_t value_size)
 {
     return (AscLinkedList){
@@ -27,52 +39,9 @@ AscLinkedList NewAssociativeLinkedList(size_t key_size, size_t value_size)
     };
 }
 
-Node *get_next(Node *node)
-{
-    return *(void**)node;
-}
-
-Node set_next(Node *node, Node *next)
-{
-    *(void**)node = next;
-}
-
 size_t Asc_GetNodeSize(size_t key_size, size_t value_size)
 {
     return sizeof(void*) + key_size + value_size;
-}
-
-Node *new_node(struct KeyValueSize *size)
-{
-    Node *node = malloc(Asc_GetNodeSize(size->key, size->value));
-
-    set_next(node, 0);
-
-    return node;
-}
-
-struct KeyValuePtr get_ptrs(struct KeyValueSize *size, Node *node)
-{
-    void *key = node + sizeof(void*);
-    void *value = node + sizeof(void*) + size->key;
-
-    return (struct KeyValuePtr){
-        .key = key,
-        .value = value
-    };
-}
-
-void set_ptrs(struct KeyValueSize *size, struct KeyValuePtr ptrs, void *key, void *value)
-{
-    memcpy(ptrs.key, key, size->key);
-    memcpy(ptrs.value, value, size->value);
-}
-
-void set_node(struct KeyValueSize *size, void *node, void *key, void *value)
-{
-    struct KeyValuePtr ptrs = get_ptrs(size, node);
-
-    set_ptrs(size, ptrs, key, value);
 }
 
 void *Asc_Find(struct KeyValueSize *size, void *head, void *key)
@@ -128,11 +97,6 @@ void *AscNode_AddFirst(struct KeyValueSize *size, Node *head, void *key, void *v
     set_ptrs(size, head_ptrs, key, value);
 
     return insert;
-}
-
-struct KeyValueSize *get_size(AscLinkedList *list)
-{
-    return (struct KeyValueSize*)list;
 }
 
 bool Asc_AddFirst(AscLinkedList *list, void *key, void *value)
@@ -205,6 +169,54 @@ struct KeyValuePtr Asc_Index(AscLinkedList *list, size_t index)
 uint8_t Asc_Remove(struct KeyValueSize *size, void *key)
 {
     
+}
+
+Node *get_next(Node *node)
+{
+    return *(void**)node;
+}
+
+Node set_next(Node *node, Node *next)
+{
+    *(void**)node = next;
+}
+
+Node *new_node(struct KeyValueSize *size)
+{
+    Node *node = malloc(Asc_GetNodeSize(size->key, size->value));
+
+    set_next(node, 0);
+
+    return node;
+}
+
+struct KeyValuePtr get_ptrs(struct KeyValueSize *size, Node *node)
+{
+    void *key = node + sizeof(void*);
+    void *value = node + sizeof(void*) + size->key;
+
+    return (struct KeyValuePtr){
+        .key = key,
+        .value = value
+    };
+}
+
+void set_ptrs(struct KeyValueSize *size, struct KeyValuePtr ptrs, void *key, void *value)
+{
+    memcpy(ptrs.key, key, size->key);
+    memcpy(ptrs.value, value, size->value);
+}
+
+void set_node(struct KeyValueSize *size, void *node, void *key, void *value)
+{
+    struct KeyValuePtr ptrs = get_ptrs(size, node);
+
+    set_ptrs(size, ptrs, key, value);
+}
+
+struct KeyValueSize *get_size(AscLinkedList *list)
+{
+    return (struct KeyValueSize*)list;
 }
 
 int main()
