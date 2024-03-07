@@ -1,22 +1,31 @@
-#include <stdlib.h>
+#pragma once
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include "asc-linked-list.h"
+#include "hash.h"
 
 struct Dictionary
 {
-    struct dictBucket *buckets;
-    unsigned int capacity;
-    unsigned int used;
+    struct KeyValueSize size;
+    struct KeyValueSize asc_size;
 
-    unsigned int keySize;
+    size_t bucket_size;
+
+    size_t capacity;
+    size_t used;
+
+    uint8_t buckets[];
 };
 
-struct Dictionary *NewDictionaryAllocate(unsigned int capacity, unsigned int keySize);
+struct Dictionary *NewDictionary(size_t key_size, size_t value_size);
 
-struct Dictionary *NewDictionary(unsigned int keySize);
-
-void DictAdd(struct Dictionary *dict, void *key, void *value);
+bool DictAdd(struct Dictionary *dict, void *key, void *value);
 
 void *DictGet(struct Dictionary *dict, void *key);
 
-unsigned char DictContainsKey(struct Dictionary *dict, void *key);
+bool DictContainsKey(struct Dictionary *dict, void *key);
+
+bool DictRemove(struct Dictionary *dict, void *key);

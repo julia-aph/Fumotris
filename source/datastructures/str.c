@@ -61,9 +61,9 @@ String *NewStringCopy(char *chars)
     return string;
 }
 
-strHead *getHead(String *string)
+strHead *get_head(String *string)
 {
-    uint8_t *object = string - sizeof(strHead);
+    char *object = string - sizeof(strHead);
 
     strHead *head = (strHead*)(object);
     return head;
@@ -71,42 +71,48 @@ strHead *getHead(String *string)
 
 void DestroyString(String *string)
 {
-    strHead *head = getHead(string);
+    strHead *head = get_head(string);
     free(head);
 }
 
 size_t StrLength(String *string)
 {
-    strHead *head = getHead(string);
+    strHead *head = get_head(string);
     return head->length;
+}
+
+void SetStrLength(String *string, size_t length)
+{
+    strHead *head = get_head(string);
+    head->length = length;
 }
 
 size_t StrCapacity(String *string)
 {
-    strHead *head = getHead(string);
+    strHead *head = get_head(string);
     return head->capacity;
 }
 
-void strRealloc(strHead **head, String **string, size_t size)
+void str_realloc(strHead **head, String **string, size_t size)
 {
     *head = realloc(*head, sizeof(strHead) + size);
     (*head)->capacity = size;
     
-    uint8_t *object = (uint8_t*)*head;
+    char *object = (char*)*head;
 
     *string = object + sizeof(strHead);
 }
 
 size_t ConcatStr(String **dest, String *src)
 {
-    strHead *destHead = getHead(*dest);
-    strHead *srcHead = getHead(src);
+    strHead *destHead = get_head(*dest);
+    strHead *srcHead = get_head(src);
 
     size_t newLength = destHead->length + srcHead->length;
     size_t newCapacity = newLength + 1;
 
     if(newCapacity > destHead->capacity)
-        strRealloc(&destHead, dest, newCapacity);
+        str_realloc(&destHead, dest, newCapacity);
 
     memcpy(*dest + destHead->length, src, srcHead->length + 1);
 
@@ -117,14 +123,14 @@ size_t ConcatStr(String **dest, String *src)
 
 size_t ConcatChars(String **dest, char *src)
 {
-    strHead *destHead = getHead(*dest);
+    strHead *destHead = get_head(*dest);
     size_t srcLength = strlen(src);
 
     size_t newLength = destHead->length + srcLength;
     size_t newCapacity = newLength + 1;
 
     if(newCapacity > destHead->capacity)
-        strRealloc(&destHead, dest, newCapacity);
+        str_realloc(&destHead, dest, newCapacity);
 
     memcpy(*dest + destHead->length, src, srcLength + 1);
 
@@ -135,13 +141,13 @@ size_t ConcatChars(String **dest, char *src)
 
 size_t ConcatChar(String **dest, char ch)
 {
-    strHead *destHead = getHead(*dest);
+    strHead *destHead = get_head(*dest);
     
     size_t newLength = destHead->length + 1;
     size_t newCapacity = newLength + 1;
 
     if(newCapacity > destHead->capacity)
-        strRealloc(&destHead, dest, newCapacity);
+        str_realloc(&destHead, dest, newCapacity);
 
     (*dest)[newLength-1] = ch;
     (*dest)[newLength] = 0;
@@ -153,7 +159,7 @@ size_t ConcatChar(String **dest, char ch)
 
 void strDebug(String *string)
 {
-    strHead *head = getHead(string);
+    strHead *head = get_head(string);
 
     uint8_t *object = (uint8_t*)head;
 

@@ -1,6 +1,14 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct Pixel
+{
+    char ch;
+    uint8_t *codes;
+    uint8_t code_count;
+};
 
 struct Buffer
 {
@@ -8,39 +16,29 @@ struct Buffer
     size_t height;
     size_t area;
     
-    char *chars;
-    uint8_t **codeBuffer;
-    uint8_t *codeBufferLengths;
+    struct Pixel pixels[];
 };
 
 struct Buffer *NewBuffer(size_t width, size_t height)
 {
+    static struct Pixel default_pixel = { '#', 0, 1 };
+
     size_t area = width * height;
 
-    char *chars = malloc(area * sizeof(char));
-
-    // Initialize each character as #
-    for(size_t i = 0; i < area; i++)
-    {
-        chars[i] = '#';
-    }
-
-    uint8_t **codeBuffer = malloc(area * sizeof(void*));
-    uint8_t *codeBufferLengths = malloc(area * sizeof(uint8_t));
+    struct Buffer *buffer = malloc(sizeof(struct Buffer) + sizeof(struct Pixel) * area);
+    memset(buffer->pixels, 0, sizeof(struct Pixel) * area);
 
     // Initialize each character with 1 code
     for(size_t i = 0; i < area; i++)
     {
-        codeBuffer[i] = calloc(1, sizeof(unsigned char));
-        codeBufferLengths[i] = 1;
+        buffer->pixels[i] = default_pixel;
+        buffer->pixels[i].codes = malloc(sizeof(uint8_t));
+        *buffer->pixels[i].codes = 95;
     }
 
-    struct Buffer *buffer = malloc(sizeof(struct Buffer));
     *buffer = (struct Buffer)
     {
         .width = width, .height = height, .area = area,
-
-        .chars = chars, .codeBuffer = codeBuffer, .codeBufferLengths = codeBufferLengths
     };
 
     return buffer;
@@ -48,13 +46,10 @@ struct Buffer *NewBuffer(size_t width, size_t height)
 
 void DestroyBuffer(struct Buffer *buffer)
 {
-    free(buffer->chars);
     for(size_t i = 0; i < buffer->area; i++)
     {
-        free(buffer->codeBuffer[i]);
+        free(buffer->pixels[i].codes);
     }
-    free(buffer->codeBuffer);
-    free(buffer->codeBufferLengths);
 
     free(buffer);
 }

@@ -18,17 +18,65 @@ struct AscLinkedList
 };
 typedef struct AscLinkedList AscLinkedList;
 
-Node *new_node(struct KeyValueSize *size);
+size_t Asc_GetNodeSize(size_t key_size, size_t value_size)
+{
+    return sizeof(void*) + key_size + value_size;
+}
 
-Node *get_next(Node *node);
-void set_next(Node *node, Node *next);
+Node *get_next(Node *node)
+{
+    return *(void**)node;
+}
 
-struct KeyValuePtr get_ptrs(struct KeyValueSize *size, Node *node);
+Node set_next(Node *node, Node *next)
+{
+    *(void**)node = next;
+}
 
-void set_ptrs(struct KeyValueSize *size, struct KeyValuePtr ptrs, void *key, void *value);
-void set_node(struct KeyValueSize *size, void *node, void *key, void *value);
+Node *new_node(struct KeyValueSize *size)
+{
+    Node *node = malloc(Asc_GetNodeSize(size->key, size->value));
 
-struct KeyValueSize *get_size(AscLinkedList *list);
+    set_next(node, 0);
+
+    return node;
+}
+
+void *get_key(Node *node)
+{
+    return node + sizeof(void*);
+}
+
+void *get_value(struct KeyValueSize *size, Node *node)
+{
+    return node + sizeof(void*) + size->key;
+}
+
+struct KeyValuePtr get_ptrs(struct KeyValueSize *size, Node *node)
+{
+    return (struct KeyValuePtr){
+        .key = get_key(node),
+        .value = get_value(size, node)
+    };
+}
+
+void set_ptrs(struct KeyValueSize *size, struct KeyValuePtr ptrs, void *key, void *value)
+{
+    memcpy(ptrs.key, key, size->key);
+    memcpy(ptrs.value, value, size->value);
+}
+
+void set_node(struct KeyValueSize *size, void *node, void *key, void *value)
+{
+    struct KeyValuePtr ptrs = get_ptrs(size, node);
+
+    set_ptrs(size, ptrs, key, value);
+}
+
+struct KeyValueSize *get_size(AscLinkedList *list)
+{
+    return (struct KeyValueSize*)list;
+}
 
 AscLinkedList NewAssociativeLinkedList(size_t key_size, size_t value_size)
 {
@@ -39,31 +87,68 @@ AscLinkedList NewAssociativeLinkedList(size_t key_size, size_t value_size)
     };
 }
 
-size_t Asc_GetNodeSize(size_t key_size, size_t value_size)
+Node *find_node(struct KeyValueSize *size, Node *head, void *key)
 {
-    return sizeof(void*) + key_size + value_size;
-}
+    Node *next = get_next(head);
 
-void *Asc_Find(struct KeyValueSize *size, void *head, void *key)
-{
-    Node *node = head;
-
-    while(node != 0 && node != head)
+    if(next == head)
     {
-        struct KeyValuePtr node_ptrs = get_ptrs(size, node);
+        if(memcmp(get_key(head), key, size->key) == 0)
+            return head;
 
-        if(memcmp(node_ptrs.key, key, size->key) == 0)
-            return node_ptrs.value;
+        return 0;
+    }
 
-        node = get_next(node);
+    for(; next != 0; next = get_next(next))
+    {
+        if(memcmp(get_key(next), key, size->key) == 0)
+            return next;
     }
 
     return 0;
 }
 
-void *AscNode_AddFirst(struct KeyValueSize *size, Node *head, void *key, void *value)
+Node *find_node_parent(struct KeyValueSize *size, Node *head, void *key)
 {
-    if(Asc_Find(size, head, key))
+    if(memcmp(get_key(head), key, size->key) == 0)
+        return head;
+    
+    Node *child = get_next(head);
+
+    if(child == head)
+        return 0;
+
+    Node *parent = head;
+
+    for(; child != 0; child = get_next(child))
+    {
+        if(memcmp(get_key(child), key, size->key) == 0)
+            return parent;
+
+        parent = child;
+    }
+
+    return 0;
+}
+
+void *AscNode_Find(struct KeyValueSize *size, void *head, void *key)
+{
+    Node *node = find_node(size, head, key);
+
+    if(node == 0)
+        return 0;
+    
+    return get_value(size, node);
+}
+
+void *Asc_Find(AscLinkedList *list, void *key)
+{
+    return AscNode_Find(&list->size, list->head, key);
+}
+
+Node *AscNode_AddFirst(struct KeyValueSize *size, Node *head, void *key, void *value)
+{
+    if(AscNode_Find(size, head, key))
         return 0;
 
     void *next_node = get_next(head);
@@ -122,127 +207,79 @@ bool Asc_AddFirst(AscLinkedList *list, void *key, void *value)
     return true;
 }
 
-bool Asc_AddLast(AscLinkedList *list, void *key, void *value)
-{
-    struct KeyValueSize *size = get_size(list);
-
-    void *last = new_node(size);
-
-    set_node(size, last, key, value);
-    set_next(list->tail, last);
-    list->tail = last;
-}
-
-void *Asc_IndexNode(struct KeyValueSize *size, void *head, size_t index)
+void *AscNode_Index(struct KeyValueSize *size, void *head, size_t index)
 {
     if(index == 0)
         return head;
 
-    void *next_node = head;
+    void *next = head;
 
-    for(int i = 0; i < index; i++)
+    for(size_t i = 0; i < index; i++)
     {
-        next_node = get_next(next_node);
+        next = get_next(next);
 
-        if(next_node == 0)
+        if(next == 0)
             return 0;
     }
 
-    return next_node;
+    return next;
 }
 
 struct KeyValuePtr Asc_Index(AscLinkedList *list, size_t index)
 {
     if(index >= list->length)
     {
-        printf("AscGet: Index %u out of bounds for length %u", index, list->length);
+        printf("AscGet: Index %llu out of bounds for length %llu", index, list->length);
         exit(1);
     }
 
     struct KeyValueSize *size = get_size(list);
 
-    void *node = Asc_IndexNode(size, list->head, index);
+    void *node = AscNode_Index(size, list->head, index);
 
     return get_ptrs(size, node);
 }
 
-uint8_t Asc_Remove(struct KeyValueSize *size, void *key)
+bool AscNode_Remove(struct KeyValueSize *size, Node *head, void *key)
 {
-    
+    Node *parent = find_node_parent(size, head, key);
+
+    if(parent == 0)
+        return false;
+
+    Node *child = get_next(parent);
+
+    if(parent == head)
+    {
+        size_t node_size = Asc_GetNodeSize(size->key, size->value);
+
+        if(child == head)
+        {
+            memset(head, 0, node_size);
+        }
+        else
+        {
+            memcpy(head, child, node_size);
+            free(child);
+        }
+    }
+    else
+    {
+        set_next(parent, get_next(child));
+        free(child);
+    }
+
+    return true;
 }
 
-Node *get_next(Node *node)
+bool Asc_Remove(AscLinkedList *list, void *key)
 {
-    return *(void**)node;
-}
+    struct KeyValueSize *size = get_size(list);
 
-Node set_next(Node *node, Node *next)
-{
-    *(void**)node = next;
-}
+    bool success = AscNode_Remove(size, list->head, key);
 
-Node *new_node(struct KeyValueSize *size)
-{
-    Node *node = malloc(Asc_GetNodeSize(size->key, size->value));
+    if(success)
+        list->length--;
 
-    set_next(node, 0);
-
-    return node;
-}
-
-struct KeyValuePtr get_ptrs(struct KeyValueSize *size, Node *node)
-{
-    void *key = node + sizeof(void*);
-    void *value = node + sizeof(void*) + size->key;
-
-    return (struct KeyValuePtr){
-        .key = key,
-        .value = value
-    };
-}
-
-void set_ptrs(struct KeyValueSize *size, struct KeyValuePtr ptrs, void *key, void *value)
-{
-    memcpy(ptrs.key, key, size->key);
-    memcpy(ptrs.value, value, size->value);
-}
-
-void set_node(struct KeyValueSize *size, void *node, void *key, void *value)
-{
-    struct KeyValuePtr ptrs = get_ptrs(size, node);
-
-    set_ptrs(size, ptrs, key, value);
-}
-
-struct KeyValueSize *get_size(AscLinkedList *list)
-{
-    return (struct KeyValueSize*)list;
-}
-
-int main()
-{
-    AscLinkedList list = NewAssociativeLinkedList(1, 1);
-
-    Asc_AddFirst(&list, "a", "1");
-    Asc_AddFirst(&list, "b", "2");
-    Asc_AddFirst(&list, "c", "3");
-    Asc_AddFirst(&list, "d", "4");
-
-    char k = *(char*)Asc_Index(&list, 0).key;
-    char v = *(char*)Asc_Index(&list, 0).value;
-    printf("%c: %c\n", k, v);
-
-    k = *(char*)Asc_Index(&list, 1).key;
-    v = *(char*)Asc_Index(&list, 1).value;
-    printf("%c: %c\n", k, v);
-
-    k = *(char*)Asc_Index(&list, 2).key;
-    v = *(char*)Asc_Index(&list, 2).value;
-    printf("%c: %c\n", k, v);
-
-    k = *(char*)Asc_Index(&list, 3).key;
-    v = *(char*)Asc_Index(&list, 3).value;
-    printf("%c: %c\n", k, v);
-
-    return 0;
+    return success;
 }

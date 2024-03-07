@@ -3,6 +3,9 @@
         "stdio.h": "c",
         "windows.h": "c",
         "stdint.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "key-value.h": "c",
+        "string.h": "c",
+        "asc-linked-list.h": "c"
     }
 }

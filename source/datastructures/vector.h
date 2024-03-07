@@ -1,3 +1,4 @@
+#pragma once
 #include <stdint.h>
 
 void *NewVectorAllocate(size_t itemSize, size_t capacity);

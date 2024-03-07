@@ -1,42 +1,57 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <pthread.h>
 
+#include "dictionary.h"
+
 struct InputAxis
 {
-    uint8_t isDown;
-    double lastDown;
+    uint8_t is_down;
+    double last_time_down;
 };
 
 struct Controller
 {
     struct Dictionary *keybinds; // char: u16
     struct Dictionary *axes; // u16: inputAxis*
-    struct InputAxis *inputAxes;
 
     pthread_mutex_t mutex;
 };
 
-struct Controller *NewController(char *keys, int *codes, int count)
+enum Controls
 {
-    struct Controller *controller = malloc(sizeof(struct Controller));
+    LEFT,
+    RIGHT,
+    SOFT_DROP,
+    HARD_DROP,
+    ROTATE_CCW,
+    ROTATE_CW,
+    ROTATE_180,
+    SWAP,
+    ESC
+};
 
-    struct Dictionary *keybinds = NewDictionaryAllocate(count, sizeof(uint8_t));
-    struct Dictionary *axes = NewDictionaryAllocate(count, sizeof(uint16_t));
-    struct InputAxis *inputAxes = calloc(count, sizeof(struct InputAxis));
+struct Controller NewController(char *keys, int *codes, int count)
+{
+    static struct InputAxis default_input_axis = { 0, 0 };
+
+    struct Dictionary *keybinds = NewDictionary(sizeof(char), sizeof(uint16_t));
+    struct Dictionary *axes = NewDictionary(sizeof(uint16_t), sizeof(struct InputAxis));
+
     for(size_t i = 0; i < count; i++)
     {
-        DictAdd(keybinds, keys + i, codes + i);
-        DictAdd(axes, codes + i, &inputAxes[i]);
+        DictAdd(keybinds, &keys[i], &codes[i]);
+        DictAdd(axes, &codes[i], &default_input_axis);
     }
 
-    controller->keybinds = keybinds;
-    controller->axes = axes;
-    controller->inputAxes = inputAxes;
+    struct Controller controller = {
+        .keybinds = keybinds, .axes = axes,
 
-    controller->mutex = PTHREAD_MUTEX_INITIALIZER;
+        .mutex = PTHREAD_MUTEX_INITIALIZER
+    };
 
     return controller;
 }
@@ -62,16 +77,3 @@ double GetTime()
 
     return (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
 }
-
-enum Controls
-{
-    LEFT,
-    RIGHT,
-    SOFT_DROP,
-    HARD_DROP,
-    ROTATE_CCW,
-    ROTATE_CW,
-    ROTATE_180,
-    SWAP,
-    ESC
-};

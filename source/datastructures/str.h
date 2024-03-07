@@ -1,3 +1,4 @@
+#pragma once
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -14,6 +15,8 @@ String *NewStringCopy(char *chars);
 void DestroyString(String *string);
 
 size_t StrLength(String *string);
+
+void SetStrLength(String *string, size_t length);
 
 size_t StrCapacity(String *string);
 

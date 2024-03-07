@@ -1,6 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 struct BlockMap
 {
@@ -12,51 +13,48 @@ struct BlockMap
     int y;
 
     uint8_t rotation;
-    uint8_t *blocks;
+    uint8_t blocks[];
 };
 
 struct BlockMap *NewBlockMap(size_t width, size_t height)
 {
     size_t area = width * height;
 
-    uint8_t *blocks = malloc(area * sizeof(unsigned char));
-    
-    // Fill with default value
-    for(size_t i = 0; i < area; i++)
-    {
-        blocks[i] = 0;
-    }
+    struct BlockMap *map = malloc(sizeof(struct BlockMap) + area * sizeof(uint8_t));
+    memset(map->blocks, 0, area);
 
-    struct BlockMap *blockMap = malloc(sizeof(struct BlockMap));
-    *blockMap = (struct BlockMap)
+    *map = (struct BlockMap)
     {
         .width = width, .height = height, .area = area,
 
         .x = 0, .y = 0,
         
-        .rotation = 0, .blocks = blocks
+        .rotation = 0
     };
 
-    return blockMap;
+    return map;
 }
 
 struct BlockMap *NewBlockMapFrom(size_t width, size_t height, uint8_t *blocks)
 {
-    struct BlockMap *blockMap = malloc(sizeof(struct BlockMap));
-    *blockMap = (struct BlockMap)
+    size_t area = width * height;
+
+    struct BlockMap *map = malloc(sizeof(struct BlockMap) + area * sizeof(uint8_t));
+    memcpy(map->blocks, blocks, area);
+
+    *map = (struct BlockMap)
     {
-        .width = width, .height = height, .area = width * height,
+        .width = width, .height = height, .area = area,
 
         .x = 0, .y = 0,
         
-        .rotation = 0, .blocks = blocks
+        .rotation = 0
     };
 
-    return blockMap;
+    return map;
 }
 
-void DestroyBlockMap(struct BlockMap *blockMap)
+void DestroyBlockMap(struct BlockMap *map)
 {
-    free(blockMap->blocks);
-    free(blockMap);
+    free(map);
 }

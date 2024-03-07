@@ -1,9 +1,12 @@
+#pragma once
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "key-value.h"
+#include "linked.h"
 
 struct AscLinkedList
 {
@@ -12,20 +15,19 @@ struct AscLinkedList
 
     size_t length;
 };
-typedef struct AscLinkedList AscLinkedList;
 
-AscLinkedList NewAssociativeLinkedList(size_t key_size, size_t value_size);
+struct AscLinkedList NewAssociativeLinkedList(size_t key_size, size_t value_size);
 
 size_t Asc_GetNodeSize(size_t key_size, size_t value_size);
 
-void *Asc_Find(struct KeyValueSize *size, void *head, void *key);
+void *AscNode_Find(struct KeyValueSize *size, void *head, void *key);
+void *Asc_Find(struct AscLinkedList *list, void *key);
 
-uint8_t Asc_AddFirstAtNode(struct KeyValueSize *size, void *head, void *key, void *value);
+Node *AscNode_AddFirst(struct KeyValueSize *size, void *head, void *key, void *value);
+bool Asc_AddFirst(struct AscLinkedList *list, void *key, void *value);
 
-uint8_t Asc_AddFirst(AscLinkedList *list, void *key, void *value);
+void *AscNode_Index(struct KeyValueSize *size, void *head, size_t index);
+struct KeyValuePtr Asc_Index(struct AscLinkedList *list, size_t index);
 
-void *Asc_IndexNode(struct KeyValueSize *size, void *head, size_t index);
-
-struct KeyValuePtr Asc_Index(AscLinkedList *list, size_t index);
-
-uint8_t Asc_Remove();
+bool AscNode_Remove(struct KeyValueSize *size, Node *head, void *key);
+bool Asc_Remove(struct AscLinkedList *list, void *key);
