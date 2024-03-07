@@ -34,21 +34,16 @@ void WindowsInit()
     system("color");
 }
 
-void WindowsKeyEvent(KEY_EVENT_RECORD keyEvent, double timestamp, struct Controller *controller)
+void WindowsKeyEvent(KEY_EVENT_RECORD key_event, double timestamp, struct Controller *controller)
 {
-    char key;
-    switch(keyEvent.wVirtualKeyCode)
-    {
-        case VK_ESCAPE: key = 27; break;
-        default: key = keyEvent.uChar.AsciiChar;
-    }
+    uint16_t key_code = key_event.wVirtualKeyCode;
     
     struct InputAxis *axis = ControllerGetAxis(controller, key);
     if(axis == 0)
         return;
 
-    axis->is_down = keyEvent.bKeyDown;
-    if(keyEvent.bKeyDown)
+    axis->is_down = key_event.bKeyDown;
+    if(key_event.bKeyDown)
     {
         axis->last_time_down = timestamp;
     }

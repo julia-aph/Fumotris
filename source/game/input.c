@@ -15,13 +15,13 @@ struct InputAxis
 
 struct Controller
 {
-    struct Dictionary *keybinds; // char: u16
-    struct Dictionary *axes; // u16: inputAxis*
+    struct Dictionary *keybinds; // int: int
+    struct Dictionary *axes; // int: inputAxis*
 
     pthread_mutex_t mutex;
 };
 
-enum Controls
+enum Control
 {
     LEFT,
     RIGHT,
@@ -34,7 +34,7 @@ enum Controls
     ESC
 };
 
-struct Controller NewController(char *keys, int *codes, int count)
+struct Controller NewController(char *keys, int *codes, size_t count)
 {
     static struct InputAxis default_input_axis = { 0, 0 };
 

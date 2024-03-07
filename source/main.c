@@ -4,12 +4,18 @@
 #include <string.h>
 #include <time.h>
 #include <pthread.h>
+
+#ifdef _WIN32
 #include <windows.h>
+#include "win.h"
+#endif
 
 #include "buffer.h"
 #include "blockmap.h"
 #include "input.h"
 #include "str.h"
+
+#include "config-TEMP.c"
 
 int FindDigits(uint8_t x)
 {
@@ -54,15 +60,14 @@ char *GenerateColorCode(uint8_t *codes, size_t count)
 
 char *DrawBufferToString(struct Buffer *buffer)
 {
-    static uint8_t *reset_code = { 0 };
+    static uint8_t reset_code = 0;
 
     size_t string_size = buffer->area + buffer->height - 1;
     char *string = NewStringAlloc(string_size);
 
     ConcatChars(&string, "\x1b[H");
-                printf("woag");
 
-    ConcatStr(&string, GenerateColorCode(reset_code, 1));
+    ConcatStr(&string, GenerateColorCode(&reset_code, 1));
 
     uint8_t last_color = 0;
 
@@ -83,6 +88,8 @@ char *DrawBufferToString(struct Buffer *buffer)
 
         ConcatChar(&string, buffer->pixels[i].ch);
     }
+
+    ConcatStr(&string, GenerateColorCode(&reset_code, 1));
 
     return string;
 }
@@ -145,11 +152,16 @@ int main()
     struct BlockMap *board = NewBlockMap(10, 10);
     struct Buffer *display_buffer = NewBuffer(20, 10);
 
+    struct Controller controller = NewController(KEYS, CODES, CONTROL_COUNT);
+
+    #ifdef _WIN32
+    WindowsInit();
+    #endif
+
     DrawBlockMapToBuffer(board, display_buffer);
 
     char *out = DrawBufferToString(display_buffer);
     puts(out);
-    printf("FUCK");
 
     return 0;
 }
