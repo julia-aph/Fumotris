@@ -10,24 +10,24 @@
 
 struct Windows
 {
-    HANDLE standardInputHandle;
+    HANDLE std_input_handle;
     HANDLE timer;
-    INPUT_RECORD inputBuffer[32];
+    INPUT_RECORD input_buffer[16];
 };
 
 static struct Windows win;
 
 void WindowsInit()
 {
-    win.standardInputHandle = GetStdHandle(STD_INPUT_HANDLE);
-    if(win.standardInputHandle == INVALID_HANDLE_VALUE)
+    win.std_input_handle = GetStdHandle(STD_INPUT_HANDLE);
+    if(win.std_input_handle == INVALID_HANDLE_VALUE)
         exit(1);
 
     win.timer = CreateWaitableTimer(NULL, TRUE, NULL);
     if(!win.timer)
         exit(1);
 
-    BOOL consoleModeOk = SetConsoleMode(win.standardInputHandle, ENABLE_WINDOW_INPUT);
+    BOOL consoleModeOk = SetConsoleMode(win.std_input_handle, ENABLE_WINDOW_INPUT);
     if(!consoleModeOk)
         exit(1);
 
@@ -37,39 +37,38 @@ void WindowsInit()
 void WindowsKeyEvent(KEY_EVENT_RECORD key_event, double timestamp, struct Controller *controller)
 {
     uint16_t key_code = key_event.wVirtualKeyCode;
-    
-    struct InputAxis *axis = ControllerGetAxis(controller, key);
+
+    struct InputAxis *axis = ControllerKeyAxis(controller, key_code);
     if(axis == 0)
         return;
 
     axis->is_down = key_event.bKeyDown;
+
     if(key_event.bKeyDown)
-    {
         axis->last_time_down = timestamp;
-    }
 }
 
-void WindowsResizeEvent(WINDOW_BUFFER_SIZE_RECORD windowEvent, struct Controller *controller)
+void WindowsResizeEvent(WINDOW_BUFFER_SIZE_RECORD window_event, struct Controller *controller)
 {
 
 }
 
 void WindowsBlockInput(struct Controller *controller)
 {
-    DWORD recordCount;
-    BOOL readOk = ReadConsoleInput(win.standardInputHandle, win.inputBuffer, 32, &recordCount);
-    if(!readOk)
+    DWORD record_count;
+    BOOL read_success = ReadConsoleInput(win.std_input_handle, win.input_buffer, 16, &record_count);
+    if(!read_success)
         exit(1);
 
     double now = GetTime();
 
     pthread_mutex_lock(&controller->mutex);
 
-    for(size_t i = 0; i < recordCount; i++)
+    for(size_t i = 0; i < record_count; i++)
     {
-        if(win.inputBuffer[i].EventType == KEY_EVENT)
+        if(win.input_buffer[i].EventType == KEY_EVENT)
         {
-            WindowsKeyEvent(win.inputBuffer[i].Event.KeyEvent, now, controller);
+            WindowsKeyEvent(win.input_buffer[i].Event.KeyEvent, now, controller);
         }
         /*else if(win->inputBuffer[i].EventType == WINDOW_BUFFER_SIZE_EVENT)
         {

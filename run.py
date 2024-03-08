@@ -43,26 +43,46 @@ def write_checksum_file(checksums):
         checksum_file.write(json.dumps(checksums))
 
 
+def get_object_names():
+    object_names = []
+
+    for file in os.listdir("objects\\"):
+        if os.path.isfile(os.path.join("objects\\", file)):
+            name = os.path.splitext(os.path.basename(file))[0]
+
+            object_names.append(name)
+
+    return object_names
+
+
 def build():
     source_files, subdirs = walk_source()
 
     checksums_before = read_checksum_file()
     checksums_now = get_checksums(source_files)
 
+    object_names = get_object_names()
     compile_list = []
 
     for path in checksums_now:
-        if not path in checksums_before or checksums_before[path] != checksums_now[path]:
+        name = os.path.splitext(os.path.basename(path))[0]
+
+        if path not in checksums_before or checksums_before[path] != checksums_now[path] or name not in object_names:
             compile_list.append(path)
 
-    write_checksum_file(checksums_now)
+        if name in object_names:
+            object_names.remove(name)
+
+    for object_name in object_names:
+        os.remove(f"objects\\{object_name}.o")
 
     for path in compile_list:
         name = os.path.splitext(os.path.basename(path))[0]
 
         os.system(f"gcc -c {path} -I {' -I '.join(subdirs)} -o objects/{name}.o -pthread -Wall")
 
-    os.system(f"gcc objects\\*.o -o {sys.argv[1]} -pthread -Wall")
+    write_checksum_file(checksums_now)
+    print(os.system(f"gcc objects\\*.o -o {sys.argv[1]} -pthread -Wall"))
 
 
 build()

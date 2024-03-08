@@ -16,13 +16,13 @@ struct InputAxis
 
 struct Controller
 {
-    struct Dictionary *keybinds; // char: u16
-    struct Dictionary *axes; // u16: inputAxis*
+    struct Dictionary *keybinds; // u16: int
+    struct Dictionary *axes; // int: InputAxis
 
     pthread_mutex_t mutex;
 };
 
-enum Controls
+enum Control
 {
     LEFT,
     RIGHT,
@@ -35,11 +35,13 @@ enum Controls
     ESC
 };
 
-struct Controller NewController(char *keys, int *codes, int count);
+struct Controller NewController(uint16_t *key_codes, enum Control *axis_codes, size_t count);
 
-struct InputAxis *ControllerGetAxis(struct Controller *controller, char key);
+struct InputAxis *ControllerKeyAxis(struct Controller *controller, uint16_t key_code);
 
-struct InputAxis *ControllerAxis(struct Controller *controller, uint16_t code);
+struct InputAxis *ControllerCodeAxis(struct Controller *controller, enum Control axis_code);
+
+void TimeInit();
 
 double GetTime();
 

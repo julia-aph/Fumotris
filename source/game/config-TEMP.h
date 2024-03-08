@@ -1,3 +1,4 @@
+#pragma once
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -5,7 +6,7 @@
 
 #include "input.h"
 
-static enum Control *CODES = {
+enum Control CODES[9] = {
     LEFT,
     RIGHT,
     SOFT_DROP,
@@ -17,7 +18,7 @@ static enum Control *CODES = {
     ESC
 };
 
-static char *KEYS = {
+uint16_t KEYS[9] = {
     'a',
     'd',
     's',
@@ -29,4 +30,4 @@ static char *KEYS = {
     27
 };
 
-static size_t CONTROL_COUNT = 9;
+size_t CONTROL_COUNT = 9;

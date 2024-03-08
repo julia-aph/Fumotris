@@ -12,10 +12,11 @@
 
 #include "buffer.h"
 #include "blockmap.h"
+#include "dictionary.h"
 #include "input.h"
 #include "str.h"
 
-#include "config-TEMP.c"
+#include "config-TEMP.h"
 
 int FindDigits(uint8_t x)
 {
@@ -147,21 +148,107 @@ void DrawBlockMapToBuffer(struct BlockMap *map, struct Buffer *buffer)
     }
 }
 
+void *InputThread(void *args)
+{
+    struct Controller *controller = (struct Controller*)args;
+
+    while(1)
+    {
+        #ifdef _WIN32
+        WindowsBlockInput(controller);
+        #endif
+
+        if(ControllerCodeAxis(controller, ESC)->is_down)
+            break;
+    }
+
+    return 0;
+}
+
+void *DrawThread(void *args)
+{
+    struct Dictionary *piece_types = NewDictionary(1, sizeof(struct BlockMap*));
+    struct BlockMap *maps[7] = {
+        NewBlockMapFrom(4, 4, (uint8_t){
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            1, 1, 1, 1,
+            0, 0, 0, 0
+        }),
+        NewBlockMapFrom(2, 2, (uint8_t){
+            1, 1,
+            1, 1
+        }),
+        NewBlockMapFrom(3, 3, (uint8_t){
+            0, 1, 0,
+            1, 1, 1,
+            0, 0, 0
+        }),
+        NewBlockMapFrom(3, 3, (uint8_t){
+            0, 1, 1,
+            1, 1, 0,
+            0, 0, 0
+        }),
+        NewBlockMapFrom(3, 3, (uint8_t){
+            1, 1, 0,
+            0, 1, 1,
+            0, 0, 0
+        }),
+        NewBlockMapFrom(3, 3, (uint8_t){
+            1, 0, 0,
+            1, 1, 1,
+            0, 0, 0
+        }),
+        NewBlockMapFrom(3, 3, (uint8_t){
+            0, 0, 1,
+            1, 1, 1,
+            0, 0, 0
+        })
+    };
+
+    struct Dictionary *piece_colors = NewDictionary(1, sizeof(uint8_t*));
+    uint8_t colors[7] = { 96, 93, 95, 92, 91, 94, 33 };
+
+    for(uint8_t i = 0; i < 7; i++)
+    {
+        DictAdd(piece_types, i + 1, maps[i]);
+        DictAdd(piece_colors, i + 1, colors[i]);
+    }
+
+    while(1)
+    {        
+        struct BlockMap *board = NewBlockMap(10, 10);
+        struct Buffer *display_buffer = NewBuffer(20, 10);
+        DrawBlockMapToBuffer(board, display_buffer);
+
+        char *out = DrawBufferToString(display_buffer);
+        puts(out);
+
+        #ifdef _WIN32
+        WindowsWait(0.1);
+        #endif
+    }
+
+    return 0;
+}
+
 int main()
 {
-    struct BlockMap *board = NewBlockMap(10, 10);
-    struct Buffer *display_buffer = NewBuffer(20, 10);
-
-    struct Controller controller = NewController(KEYS, CODES, CONTROL_COUNT);
+    TimeInit();
 
     #ifdef _WIN32
     WindowsInit();
     #endif
 
-    DrawBlockMapToBuffer(board, display_buffer);
+    struct Controller controller = NewController(KEYS, CODES, CONTROL_COUNT);
 
-    char *out = DrawBufferToString(display_buffer);
-    puts(out);
+    pthread_t input_thread;
+    pthread_create(&input_thread, 0, InputThread, &controller);
+
+    pthread_t draw_thread;
+    pthread_create(&draw_thread, 0, DrawThread, 0);
+
+    pthread_join(input_thread, 0);
 
     return 0;
 }

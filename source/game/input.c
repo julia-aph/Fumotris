@@ -15,8 +15,8 @@ struct InputAxis
 
 struct Controller
 {
-    struct Dictionary *keybinds; // int: int
-    struct Dictionary *axes; // int: inputAxis*
+    struct Dictionary *keybinds; // u16: int
+    struct Dictionary *axes; // int: InputAxis
 
     pthread_mutex_t mutex;
 };
@@ -34,17 +34,17 @@ enum Control
     ESC
 };
 
-struct Controller NewController(char *keys, int *codes, size_t count)
+struct Controller NewController(uint16_t *key_codes, enum Control *axis_codes, size_t count)
 {
     static struct InputAxis default_input_axis = { 0, 0 };
 
-    struct Dictionary *keybinds = NewDictionary(sizeof(char), sizeof(uint16_t));
-    struct Dictionary *axes = NewDictionary(sizeof(uint16_t), sizeof(struct InputAxis));
+    struct Dictionary *keybinds = NewDictionary(sizeof(uint16_t), sizeof(enum Control));
+    struct Dictionary *axes = NewDictionary(sizeof(enum Control), sizeof(struct InputAxis));
 
     for(size_t i = 0; i < count; i++)
     {
-        DictAdd(keybinds, &keys[i], &codes[i]);
-        DictAdd(axes, &codes[i], &default_input_axis);
+        DictAdd(keybinds, &key_codes[i], &axis_codes[i]);
+        DictAdd(axes, &axis_codes[i], &default_input_axis);
     }
 
     struct Controller controller = {
@@ -56,18 +56,28 @@ struct Controller NewController(char *keys, int *codes, size_t count)
     return controller;
 }
 
-struct InputAxis *ControllerGetAxis(struct Controller *controller, char key)
+struct InputAxis *ControllerKeyAxis(struct Controller *controller, uint16_t key_code)
 {
-    uint16_t *code = DictGet(controller->keybinds, &key);
-    if(code == 0)
+    uint16_t *axis_code = DictGet(controller->keybinds, &key_code);
+    if(axis_code == 0)
         return 0;
 
-    return DictGet(controller->axes, code);
+    return DictGet(controller->axes, axis_code);
 }
 
-struct InputAxis *ControllerAxis(struct Controller *controller, uint16_t code)
+struct InputAxis *ControllerCodeAxis(struct Controller *controller, enum Control axis_code)
 {
-    return DictGet(controller->axes, &code);
+    return DictGet(controller->axes, &axis_code);
+}
+
+time_t START_TIME = 0;
+
+void TimeInit()
+{
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+
+    START_TIME = ts.tv_sec;
 }
 
 double GetTime()
@@ -75,5 +85,5 @@ double GetTime()
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);
 
-    return (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0);
+    return ts.tv_sec - START_TIME + (double)ts.tv_nsec / 1000000000.0;
 }
