@@ -6,6 +6,8 @@
         "stdlib.h": "c",
         "key-value.h": "c",
         "string.h": "c",
-        "asc-linked-list.h": "c"
+        "asc-linked-list.h": "c",
+        "config-temp.h": "c",
+        "stdbool.h": "c"
     }
 }

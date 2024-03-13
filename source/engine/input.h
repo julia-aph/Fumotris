@@ -41,7 +41,12 @@ struct InputAxis *ControllerKeyAxis(struct Controller *controller, uint16_t key_
 
 struct InputAxis *ControllerCodeAxis(struct Controller *controller, enum Control axis_code);
 
-void TimeInit();
+void StartInputThread(struct Controller *ctrl);
 
-double GetTime();
+void ControllerLockWrite(struct Controller *ctrl);
 
+void ControllerUnlockWrite(struct Controller *ctrl);
+
+void ControllerLockRead(struct Controller *ctrl);
+
+void ControllerUnlockRead(struct Controller *ctrl);

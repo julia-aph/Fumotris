@@ -19,6 +19,10 @@ struct Controller
     struct Dictionary *axes; // int: InputAxis
 
     pthread_mutex_t mutex;
+    unsigned int readers;
+
+    size_t width;
+    size_t height;
 };
 
 enum Control
@@ -36,7 +40,9 @@ enum Control
 
 struct Controller NewController(uint16_t *key_codes, enum Control *axis_codes, size_t count)
 {
-    static struct InputAxis default_input_axis = { 0, 0 };
+    static struct InputAxis DEFAULT_INPUT_AXIS = { 0, 0 };
+    static size_t DEFAULT_WIDTH = 20;
+    static size_t DEFAULT_HEIGHT = 10;
 
     struct Dictionary *keybinds = NewDictionary(sizeof(uint16_t), sizeof(enum Control));
     struct Dictionary *axes = NewDictionary(sizeof(enum Control), sizeof(struct InputAxis));
@@ -44,16 +50,48 @@ struct Controller NewController(uint16_t *key_codes, enum Control *axis_codes, s
     for(size_t i = 0; i < count; i++)
     {
         DictAdd(keybinds, &key_codes[i], &axis_codes[i]);
-        DictAdd(axes, &axis_codes[i], &default_input_axis);
+        DictAdd(axes, &axis_codes[i], &DEFAULT_INPUT_AXIS);
     }
 
     struct Controller controller = {
         .keybinds = keybinds, .axes = axes,
 
-        .mutex = PTHREAD_MUTEX_INITIALIZER
+        .mutex = PTHREAD_MUTEX_INITIALIZER, .readers = 0,
+
+        .width = DEFAULT_WIDTH, .height = DEFAULT_HEIGHT
     };
 
     return controller;
+}
+
+void ControllerLockWrite(struct Controller *ctrl)
+{
+    pthread_mutex_lock(ctrl->mutex);
+}
+
+void ControllerUnlockWrite(struct Controller *ctrl)
+{
+    pthread_mutex_unlock(ctrl->mutex);
+}
+
+void ControllerLockRead(struct Controller *ctrl)
+{
+    if(ctrl->readers == 0)
+    {
+        pthread_mutex_lock(ctrl->mutex);
+    }
+
+    ctrl->readers += 1;
+}
+
+void ControllerUnlockRead(struct Controller *ctrl)
+{
+    if(ctrl->readers == 1)
+    {
+        pthread_mutex_unlock(ctrl->mutex);
+    }
+
+    ctrl->readers -= 1;
 }
 
 struct InputAxis *ControllerKeyAxis(struct Controller *controller, uint16_t key_code)
@@ -70,20 +108,26 @@ struct InputAxis *ControllerCodeAxis(struct Controller *controller, enum Control
     return DictGet(controller->axes, &axis_code);
 }
 
-time_t START_TIME = 0;
+static pthread_t INPUT_THREAD;
 
-void TimeInit()
+void *input_thread(void *args)
 {
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
+    struct Controller *ctrl = (struct Controller*)args;
 
-    START_TIME = ts.tv_sec;
+    while(1)
+    {
+        #ifdef _WIN32
+        WindowsBlockInput(ctrl);
+        #endif
+
+        if(ControllerCodeAxis(ctrl, ESC)->is_down)
+            break;
+    }
+
+    return 0;
 }
 
-double GetTime()
+void StartInputThread(struct Controller *ctrl)
 {
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
-
-    return ts.tv_sec - START_TIME + (double)ts.tv_nsec / 1000000000.0;
+    pthread_create(&INPUT_THREAD, 0, input_thread, ctrl);
 }

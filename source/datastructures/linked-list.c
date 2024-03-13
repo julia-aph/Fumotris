@@ -3,99 +3,156 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "linked.h"
+
 struct LinkedList
 {
-    int valueSize;
-    void **head;
-    unsigned int length;
+    size_t value_size;
+
+    Node *head;
+    Node *tail;
+
+    size_t length;
 };
+typedef struct LinkedList LinkedList;
 
-struct LinkedList *NewLinkedList(int valueSize)
+LinkedList NewLinkedList(size_t value_size)
 {
-    struct LinkedList *list = malloc(sizeof(struct LinkedList));
+    return (LinkedList){
+        .value_size = value_size,
 
-    list->valueSize = valueSize;
-    list->head = 0;
-    list->length = 0;
+        .head = 0,
 
-    return list;
+        .length = 0
+    };
 }
 
-void **linkedListGetNode(struct LinkedList* list, int index)
+static Node *get_next(Node *node)
 {
-    void **current = list->head;
-
-    for(int i = 0; i < index; i++)
-    {
-        current = *current;
-    }
-
-    return current;
+    return *(void**)node;
 }
 
-void **newLinkedListNode(struct LinkedList *list, char *value)
+static void set_next(Node *node, Node *next)
 {
-    char *node = malloc(sizeof(void*) + list->valueSize);
-    for(int i = 0; i < list->valueSize; i++)
-    {
-        node[sizeof(void*) + i] = value[i];
-    }
-    *(void**)node = 0;
-
-    return (void**)node;
+    *(void**)node = next;
 }
 
-void *LinkedListGet(struct LinkedList *list, int index)
+static void *get_value(Node *node)
 {
-    return (char*)linkedListGetNode(list, index) + sizeof(void*);
+    return node + sizeof(void*);
 }
 
-void LinkedListAdd(struct LinkedList *list, void *value)
+static Node *new_node(size_t value_size, void *value)
 {
+    Node *node = malloc(sizeof(void*) + value_size);
+    
+    set_next(node, 0);
+    memcpy(node + sizeof(void*), value, value_size);
+
+    return node;
+}
+
+void LinkedList_AddLast(LinkedList *list, void *value)
+{
+    Node *node = new_node(list->value_size, value);
+    list->length++;
+
     if(list->head == 0)
     {
-        list->head = newLinkedListNode(list, value);
+        list->head = node;
+        list->tail = node;
     }
     else
     {
-        void **parentNode = linkedListGetNode(list, list->length-1);
-        *parentNode = newLinkedListNode(list, value);
+        set_next(list->tail, node);
     }
-    list->length++;
 }
 
-void LinkedListInsert(struct LinkedList *list, void *value, int index)
+void LinkedList_AddFirst(LinkedList *list, void *value)
 {
-    void **newNode = newLinkedListNode(list, value);
+    Node *node = new_node(list->value_size, value);
+    list->length++;
 
-    if(index == 0)
+    if(list->head == 0)
     {
-        *newNode = list->head;
-        list->head = newNode;
+        list->head = node;
+        list->tail = node;
     }
     else
     {
-        void **parentNode = linkedListGetNode(list, index-1);
-        *newNode = *parentNode;
-        *parentNode = newNode;
+        set_next(node, list->head);
+        list->head = node;
     }
-    list->length++;
 }
 
-void LinkedListRemove(struct LinkedList *list, int index)
+static Node *index_node(LinkedList *list, size_t index)
+{
+    if(index > list->length)
+    {
+        printf("LinkedList: Index %llu out of bounds for list of length %llu\n", index, list->length);
+        exit(1);
+    }
+
+    Node *next = list->head;
+
+    for(size_t i = 0; i < index; i++)
+    {
+        next = get_next(next);
+    }
+
+    return next;
+}
+
+void *LinkedList_Index(LinkedList *list, size_t index)
+{
+    Node *node = index_node(list, index);
+
+    return get_value(node);
+}
+
+void LinkedList_Insert(LinkedList *list, size_t index, void *value)
 {
     if(index == 0)
     {
-        void **newHeadNode = *list->head;
-        free(list->head);
-        list->head = newHeadNode;
+        LinkedList_AddFirst(list, value);
+        return;
+    }
+
+    if(index == list->length)
+    {
+        LinkedList_AddLast(list, value);
+        return;
+    }
+
+    Node *node = new_node(list->value_size, value);
+    list->length++;
+
+    Node *parent = index_node(list, index - 1);
+
+    set_next(node, get_next(parent));
+    set_next(parent, node);
+}
+
+void LinkedList_Remove(LinkedList *list, size_t index)
+{
+    if(index == 0)
+    {
+        Node *node = list->head;
+
+        list->head = get_next(node);
+
+        free(node);
     }
     else
     {
-        void **parentNode = linkedListGetNode(list, index-1);
-        void **targetNode = (void**)*parentNode;
-        *parentNode = *targetNode;
-        free(targetNode);
+        Node *parent = index_node(list, index - 1);
+
+        Node *child = get_next(parent);
+
+        set_next(parent, get_next(child));
+
+        free(child);
     }
+
     list->length--;
 }

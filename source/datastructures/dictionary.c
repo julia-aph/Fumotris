@@ -50,6 +50,11 @@ void *get_bucket(Dictionary *dict, uint32_t hash)
     return dict->buckets + index * dict->bucket_size;
 }
 
+static void *get_value(Dictionary *dict, uint8_t *pair)
+{
+    return pair + dict->size.key;
+}
+
 bool DictAdd(Dictionary *dict, void *key, void *value)
 {
     uint32_t hash = Hash(key, dict->size.key);
@@ -59,9 +64,9 @@ bool DictAdd(Dictionary *dict, void *key, void *value)
     uint8_t pair[dict->size.key + dict->size.value];
 
     memcpy(pair, key, dict->size.key);
-    memcpy(pair + dict->size.key, value, dict->size.value);
+    memcpy(get_value(dict, pair), value, dict->size.value);
 
-    return AscNode_AddFirst(&dict->asc_size, bucket, &hash, &pair);
+    return AscNode_AddFirst(&dict->asc_size, bucket, &hash, &pair) != 0;
 }
 
 void *DictGet(Dictionary *dict, void *key)
@@ -74,8 +79,8 @@ void *DictGet(Dictionary *dict, void *key)
 
     if(pair == 0)
         return 0;
-
-    return pair + dict->size.key;
+        
+    return get_value(dict, pair);
 }
 
 bool DictContainsKey(Dictionary *dict, void *key)

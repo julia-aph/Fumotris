@@ -12,3 +12,4 @@ enum Type
     ARRAY,
     STRING
 };
+

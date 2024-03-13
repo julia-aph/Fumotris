@@ -27,8 +27,8 @@ void WindowsInit()
     if(!win.timer)
         exit(1);
 
-    BOOL consoleModeOk = SetConsoleMode(win.std_input_handle, ENABLE_WINDOW_INPUT);
-    if(!consoleModeOk)
+    BOOL console_mode_success = SetConsoleMode(win.std_input_handle, ENABLE_WINDOW_INPUT);
+    if(!console_mode_success)
         exit(1);
 
     system("color");
@@ -53,7 +53,7 @@ void WindowsResizeEvent(WINDOW_BUFFER_SIZE_RECORD window_event, struct Controlle
 
 }
 
-void WindowsBlockInput(struct Controller *controller)
+void WindowsBlockInput(struct Controller *ctrl)
 {
     DWORD record_count;
     BOOL read_success = ReadConsoleInput(win.std_input_handle, win.input_buffer, 16, &record_count);
@@ -62,13 +62,13 @@ void WindowsBlockInput(struct Controller *controller)
 
     double now = GetTime();
 
-    pthread_mutex_lock(&controller->mutex);
+    ControllerLockWrite(ctrl);
 
     for(size_t i = 0; i < record_count; i++)
     {
         if(win.input_buffer[i].EventType == KEY_EVENT)
         {
-            WindowsKeyEvent(win.input_buffer[i].Event.KeyEvent, now, controller);
+            WindowsKeyEvent(win.input_buffer[i].Event.KeyEvent, now, ctrl);
         }
         /*else if(win->inputBuffer[i].EventType == WINDOW_BUFFER_SIZE_EVENT)
         {
@@ -76,7 +76,7 @@ void WindowsBlockInput(struct Controller *controller)
         }*/
     }
 
-    pthread_mutex_unlock(&controller->mutex);
+    ControllerUnlockWrite(ctrl);
 }
 
 void WindowsWait(double seconds)
