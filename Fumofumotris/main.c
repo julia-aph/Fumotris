@@ -7,6 +7,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "win.h"
+
 #define nullptr ((void*)0)
 
 struct CharBlock {
@@ -20,13 +22,10 @@ struct TermBuffer {
     size_t hgt;
     size_t area;
 
+    size_t max_size;
+
     struct CharBlock blocks[];
 };
-
-size_t TermBufferMaxChars(struct TermBuffer *term)
-{
-    return term->area + term->hgt - 1 + term->area * 10 + 8;
-}
 
 struct TermBuffer *NewTermBuffer(size_t wid, size_t hgt)
 {
@@ -35,7 +34,8 @@ struct TermBuffer *NewTermBuffer(size_t wid, size_t hgt)
     struct TermBuffer *buf = malloc(sizeof(struct TermBuffer) + area * sizeof(struct CharBlock));
 
     *buf = (struct TermBuffer){
-        .wid = wid, .hgt = hgt, .area = area
+        .wid = wid, .hgt = hgt, .area = area,
+        .max_size = area + (area * 10) + (hgt - 1) + 12
     };
     memset(buf->blocks, 0, area * sizeof(struct CharBlock));
 
@@ -47,41 +47,41 @@ size_t TermBufferToStringBuffer(struct TermBuffer *term, char *buf, size_t str_s
     uint8_t last_bg = 0;
     uint8_t last_fg = 0;
 
-    size_t filled = snprintf(buf, str_size, "\x1b[0m");
+    size_t filled = snprintf(buf, str_size, "\x1b[H\x1b[0m");
 
-    for(size_t y = term->hgt - 1;; y--)
-    {
-    for(size_t x = 0; x < term->wid; x++)
-    {
-        size_t i = y * term->hgt + x;
+    for (size_t y = 0; y < term->hgt; y++) {
+    for (size_t x = 0; x < term->wid; x++) {
+        size_t i = y * term->wid + x;
         struct CharBlock *block = &term->blocks[i];
 
+        //DEBUG
+        if (block->ch == 0)
+            block->ch = '#';
+        //DEBUG
+
         uint8_t bg = 0;
-        if(block->bg != 0 and block->bg != last_bg)
+        if (block->bg != 0 and block->bg != last_bg)
             bg = block->bg;
 
         uint8_t fg = 0;
-        if(block->fg != 0 and block->fg != last_fg)
+        if (block->fg != 0 and block->fg != last_fg)
             fg = block->fg;
 
-        if(bg == 0 and fg == 0) {
+        if (bg == 0 and fg == 0) {
             buf[filled] = block->ch;
             filled += 1;
         }
-        else if(bg != 0 and fg != 0) {
+        else if (bg != 0 and fg != 0) {
             filled += snprintf(buf + filled, str_size - filled, "\x1b[%u;%um%c", bg, fg, block->ch);
 
             last_bg = bg;
             last_fg = fg;
-        } else if(bg != 0) {
+        } else if (bg != 0) {
             filled += snprintf(buf + filled, str_size - filled, "\x1b[%um%c", bg, block->ch);
-        } else if(fg != 0) {
+        } else if (fg != 0) {
             filled += snprintf(buf + filled, str_size - filled, "\x1b[%um%c", fg, block->ch);
         }
     }
-        if(y == 0)
-            break;
-
         buf[filled] = '\n';
         filled += 1;
     }
@@ -111,7 +111,6 @@ struct TetrMap *NewTetrMap(size_t wid, size_t hgt)
     struct TetrMap *map = malloc(sizeof(struct TetrMap) + area);
     *map = (struct TetrMap){
         .wid = wid, .hgt = hgt, .area = area,
-
         .x = 0, .y = 0
     };
     memset(map->blocks, 0, area);
@@ -121,19 +120,17 @@ struct TetrMap *NewTetrMap(size_t wid, size_t hgt)
 
 void DrawTetrMapToTermBuffer(struct TetrMap *map, struct TermBuffer *term)
 {
-    static uint8_t BLOCK_COLORS[8] = { 90, 96, 93, 95, 92, 91, 94, 33 };
+    static const uint8_t BLOCK_COLORS[8] = { 90, 96, 93, 95, 92, 91, 94, 33 };
 
-    for(size_t y = 0; y < map->hgt; y++)
-    {
-    for(size_t x = 0; x < map->wid; x++)
-    {
-        size_t map_i = y * map->hgt + x;
-        size_t buf_i = term->wid * (map->y + y) + (map->x + x) * 2;
+    for (size_t y = 0; y < map->hgt; y++) {
+    for (size_t x = 0; x < map->wid; x++) {
+        size_t map_i = y * map->wid + x;
+        size_t buf_i = (y + map->y) * term->wid + (x + map->x) * 2;
 
         struct CharBlock *a = &term->blocks[buf_i];
         struct CharBlock *b = &term->blocks[buf_i + 1];
 
-        if(map->blocks[map_i] == 0) {
+        if (map->blocks[map_i] == 0) {
             a->ch = '(';
             b->ch = ')';
         } else {
@@ -148,24 +145,64 @@ void DrawTetrMapToTermBuffer(struct TetrMap *map, struct TermBuffer *term)
     }
 }
 
-int main()
+bool TetrCollisionCheck(struct TetrMap *board, struct TetrMap *piece, int dx, int dy)
 {
-    struct TermBuffer *disp_term = NewTermBuffer(20, 10);
+    size_t i = 0;
+    for (size_t y = piece->y + dy; y < piece->y + piece->hgt + dy; y++) {
+    for (size_t x = piece->x + dx; x < piece->x + piece->wid + dx; x++) {
+        if(piece->blocks[i] == 0)
+            goto next;
 
-    size_t disp_buf_max = TermBufferMaxChars(disp_term) + 1;
-    char *disp_buf = malloc(disp_buf_max);
+        if(y >= board->hgt or x >= board->wid)
+            return false;
 
-    for(size_t i = 0; i < disp_term->area; i++)
-    {
-        disp_term->blocks[i].ch = '#';
+        size_t board_i = y * board->wid + x;
+        if(board->blocks[board_i] != 0)
+            return false;
+next:
+        i++;
+    }
     }
 
-    struct TetrMap *board = NewTetrMap(10, 10);
-    DrawTetrMapToTermBuffer(board, disp_term);
+    return true;
+}
 
-    TermBufferToStringBuffer(disp_term, disp_buf, disp_buf_max);
+void Loop()
+{
+    struct TermBuffer *disp_term = NewTermBuffer(20, 20);
+    char *disp_buf = malloc(disp_term->max_size);
 
-    puts(disp_buf);
+    struct TetrMap *board = NewTetrMap(10, 20);
+    struct TetrMap *falling = NewTetrMap(4, 4);
+
+    uint8_t I[16] = {
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        1, 1, 1, 1,
+        0, 0, 0, 0
+    };
+    for (size_t i = 0; i < 16; i++) {
+        falling->blocks[i] = I[i];
+    }
+
+    for (int i = 0; i < 10; i++) {
+        DrawTetrMapToTermBuffer(board, disp_term);
+        DrawTetrMapToTermBuffer(falling, disp_term);
+
+        TermBufferToStringBuffer(disp_term, disp_buf, disp_term->max_size);
+        puts(disp_buf);
+
+        falling->y += 1;
+
+        WindowsWait(0.2);
+    }
+}
+
+int main()
+{
+    WindowsInit();
+
+    Loop();
 
     return 0;
 }
