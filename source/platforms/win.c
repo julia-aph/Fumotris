@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #include "input.h"
+#include "gametime.h"
 
 struct Windows
 {

@@ -20,6 +20,10 @@ struct Controller
     struct Dictionary *axes; // int: InputAxis
 
     pthread_mutex_t mutex;
+    unsigned int readers;
+
+    size_t width;
+    size_t height;
 };
 
 enum Control

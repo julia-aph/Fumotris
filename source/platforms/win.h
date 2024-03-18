@@ -8,6 +8,7 @@
 #include <windows.h>
 
 #include "input.h"
+#include "gametime.h"
 
 void WindowsInit();
 

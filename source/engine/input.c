@@ -66,19 +66,19 @@ struct Controller NewController(uint16_t *key_codes, enum Control *axis_codes, s
 
 void ControllerLockWrite(struct Controller *ctrl)
 {
-    pthread_mutex_lock(ctrl->mutex);
+    pthread_mutex_lock(&ctrl->mutex);
 }
 
 void ControllerUnlockWrite(struct Controller *ctrl)
 {
-    pthread_mutex_unlock(ctrl->mutex);
+    pthread_mutex_unlock(&ctrl->mutex);
 }
 
 void ControllerLockRead(struct Controller *ctrl)
 {
     if(ctrl->readers == 0)
     {
-        pthread_mutex_lock(ctrl->mutex);
+        pthread_mutex_lock(&ctrl->mutex);
     }
 
     ctrl->readers += 1;
@@ -88,7 +88,7 @@ void ControllerUnlockRead(struct Controller *ctrl)
 {
     if(ctrl->readers == 1)
     {
-        pthread_mutex_unlock(ctrl->mutex);
+        pthread_mutex_unlock(&ctrl->mutex);
     }
 
     ctrl->readers -= 1;
@@ -106,28 +106,4 @@ struct InputAxis *ControllerKeyAxis(struct Controller *controller, uint16_t key_
 struct InputAxis *ControllerCodeAxis(struct Controller *controller, enum Control axis_code)
 {
     return DictGet(controller->axes, &axis_code);
-}
-
-static pthread_t INPUT_THREAD;
-
-void *input_thread(void *args)
-{
-    struct Controller *ctrl = (struct Controller*)args;
-
-    while(1)
-    {
-        #ifdef _WIN32
-        WindowsBlockInput(ctrl);
-        #endif
-
-        if(ControllerCodeAxis(ctrl, ESC)->is_down)
-            break;
-    }
-
-    return 0;
-}
-
-void StartInputThread(struct Controller *ctrl)
-{
-    pthread_create(&INPUT_THREAD, 0, input_thread, ctrl);
 }

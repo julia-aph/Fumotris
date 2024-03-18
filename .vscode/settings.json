@@ -8,6 +8,8 @@
         "string.h": "c",
         "asc-linked-list.h": "c",
         "config-temp.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "win.h": "c",
+        "dictionary.h": "c"
     }
 }
