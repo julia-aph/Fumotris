@@ -7,9 +7,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "win.h"
-
-#define nullptr ((void*)0)
+#include "fumotris.h"
 
 struct CharBlock {
     char ch;

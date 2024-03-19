@@ -7,6 +7,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "fumotris.h"
+
 #ifdef _WIN32
 #include "win.h"
 #endif
@@ -48,57 +50,131 @@ hash_type Hash(void *item, size_t size)
     return h;
 }
 
-struct ctrl_bucket {
+typedef uint16_t ctrl_key;
+struct ctrl_bkt {
     hash_type hash;
-    enum CtrlCode key;
-    struct InputButton val;
+    ctrl_key key;
+    size_t index;
+
+    struct InputButton button;
 };
 
-struct Controller {
-    size_t bucket_count;
+struct ctrl_dict {
+    size_t cap;
     size_t filled;
 
-    struct ctrl_bucket buckets[];
+    struct ctrl_bkt buckets[];
 };
 
-struct Controller *NewCtrl()
+typedef struct Ctrl {
+    struct ctrl_dict *dict;
+} Ctrl;
+
+hash_type ctrl_hash(ctrl_key key)
 {
-    static const size_t INIT_BUCKETS = 16;
-
-    size_t buckets_size = sizeof(struct ctrl_bucket) * INIT_BUCKETS;
-
-    struct Controller *ctrl = malloc(sizeof(struct Controller) + buckets_size);
-    *ctrl = (struct Controller) {
-        .bucket_count = INIT_BUCKETS, .filled = 0
-    };
-    memset(ctrl->buckets, 0, buckets_size);
-
-    return ctrl;
+    return Hash(key, sizeof(ctrl_key));
 }
 
-void CtrlAdd(struct Controller *ctrl, enum CtrlCode key, struct InputButton val)
+bool NewCtrl(Ctrl *out)
 {
-    hash_type hash = Hash(key, sizeof(enum CtrlCode));
-    size_t i = hash % ctrl->bucket_count;
+    static const size_t INIT_CAP = 16;
 
-    ctrl->buckets[i] = (struct ctrl_bucket) {
-        .hash = hash, .key = key, .val = val
-    };
-}
-
-bool CtrlRemove(struct Controller *ctrl, enum CtrlCode key)
-{
-    hash_type hash = Hash(key, sizeof(enum CtrlCode));
-    size_t i = hash % ctrl->bucket_count;
-
-    if (ctrl->buckets[i].hash == 0)
+    size_t bkts_size = INIT_CAP * sizeof(struct ctrl_bkt);
+    size_t alloc_size = sizeof(struct ctrl_dict) + bkts_size;
+    struct ctrl_dict *dict = malloc(alloc_size);
+    if (!dict)
         return false;
     
-    memset(ctrl->buckets + i, 0, sizeof(struct ctrl_bucket));
+    dict->cap = INIT_CAP;
+    dict->filled = 0;
+    memset(dict->buckets, 0, bkts_size);
+
+    out->dict = dict;
     return true;
 }
 
+struct ctrl_dict *resize_ctrl(struct ctrl_dict *dict, size_t new_cap)
+{
+    size_t bkts_size = new_cap * sizeof(struct ctrl_bkt);
+    size_t alloc_size = sizeof(struct ctrl_dict) + bkts_size;
+    struct ctrl_dict *new_dict = malloc(alloc_size);
+    if (!new_dict)
+        return nullptr;
 
+    new_dict->cap = new_cap;
+    new_dict->filled = dict->filled;
+    memset(dict->buckets, 0, bkts_size);
+
+    for (size_t i = 0; i < dict->cap; i++) {
+        hash_type hash = dict->buckets[i].hash;
+        if (hash == 0)
+            continue;
+        size_t new_i = hash % new_cap;
+
+        new_dict->buckets[new_i].hash = hash;
+        new_dict->buckets[new_i].key = dict->buckets[i].key;
+
+        size_t index = dict->buckets[i].index;
+        new_dict->buckets[new_i].index = index;
+        new_dict->buckets[index].button = dict->buckets[i].button;
+    }
+
+    return new_dict;
+}
+
+size_t lin_probe(struct ctrl_dict *ctrl, size_t i)
+{
+
+}
+
+bool CtrlAdd(Ctrl ctrl, ctrl_key key)
+{
+    struct ctrl_dict *dict = ctrl.dict;
+    hash_type hash = ctrl_hash(key);
+    size_t i = hash % dict->cap;
+
+    float load = (float)dict->filled / dict->cap;
+    if (load > 0.75f) {
+        void *ptr = ctrl_resize(dict, dict->cap * 2);
+        if (!ptr)
+            return false;
+        ctrl.dict = ptr;
+    }
+
+    if (dict->buckets[i].hash != 0)
+        i = lin_probe(dict, i);
+
+    dict->buckets[i].hash = hash;
+    dict->buckets[i].key = key;
+    dict->buckets[i].index = dict->filled;
+
+    dict->filled += 1;
+
+    return true;
+}
+
+bool CtrlRemove(Ctrl ctrl, ctrl_key key)
+{
+    struct ctrl_dict *dict = ctrl.dict;
+    hash_type hash = ctrl_hash(key);
+    size_t i = hash % dict->cap;
+
+    if (dict->buckets[i].hash == 0)
+        return false;
+
+    dict->buckets[i].hash = 0;
+    dict->filled -= 1;
+
+    return true;
+}
+
+double GetTime()
+{
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+
+    return ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
+}
 
 static const size_t IO_BUF_SIZE = 8;
 
@@ -132,7 +208,9 @@ void key_event(struct KeyEvent key_event)
     struct InputButton *but = CtrlGetButton(key_event.key);
     but->is_down = key_event.is_down;
     if (but->is_down)
-        but->last_pressed = 
+        but->last_pressed = key_event.timestamp;
+    else
+        but->last_released = key_event.timestamp;
 }
 
 void resize_event(struct ResizeEvent resize_event)
@@ -175,12 +253,4 @@ void StartInput()
 {
     pthread_t input_thread;
     pthread_create(&input_thread, null, block_input, 0);
-}
-
-double TimeNow()
-{
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
-
-    return ts.tv_sec - GAME_START_SEC + (double)ts.tv_nsec / 1000000000.0;
 }
