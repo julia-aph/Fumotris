@@ -75,7 +75,7 @@ hash_type ctrl_hash(ctrl_key key)
     return Hash(key, sizeof(ctrl_key));
 }
 
-bool NewCtrl(Ctrl *out)
+Ctrl NewCtrl()
 {
     static const size_t INIT_CAP = 16;
 
@@ -83,14 +83,15 @@ bool NewCtrl(Ctrl *out)
     size_t alloc_size = sizeof(struct ctrl_dict) + bkts_size;
     struct ctrl_dict *dict = malloc(alloc_size);
     if (!dict)
-        return false;
+        return ;
     
     dict->cap = INIT_CAP;
     dict->filled = 0;
     memset(dict->buckets, 0, bkts_size);
 
-    out->dict = dict;
-    return true;
+    return (Ctrl) { dict };
+    Ctrl ctrl = NewCtrl();
+    if(ctrl->result)
 }
 
 struct ctrl_dict *resize_ctrl(struct ctrl_dict *dict, size_t new_cap)
