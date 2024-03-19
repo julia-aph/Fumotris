@@ -5,6 +5,6 @@
 
 void WindowsInit();
 
-bool WindowsBlockInput(struct InputEvent event_buf[IO_BUF_SIZE]);
+bool WindowsBlockInput(struct InputEvent event_buf[IO_BUF_SIZE], size_t *results);
 
 void WindowsWait(double seconds);

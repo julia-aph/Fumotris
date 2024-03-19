@@ -26,7 +26,7 @@ bool WindowsInit()
         return false;
 }
 
-struct InputEvent key_event(KEY_EVENT_RECORD key_event)
+struct InputEvent key_event(KEY_EVENT_RECORD key_event, double timestamp)
 {   
     struct InputEvent event;
 
@@ -38,7 +38,8 @@ struct InputEvent key_event(KEY_EVENT_RECORD key_event)
     event.type = KEY,
     event.key_event = (struct KeyEvent) {
         .key = key_event.wVirtualKeyCode,
-        .is_down = key_event.bKeyDown
+        .is_down = key_event.bKeyDown,
+        .timestamp = timestamp
     };
     return event;
 }
@@ -55,11 +56,11 @@ struct InputEvent resize_event(WINDOW_BUFFER_SIZE_RECORD window_event)
     return event;
 }
 
-struct InputEvent dispatch_event(INPUT_RECORD input_record)
+struct InputEvent dispatch_event(INPUT_RECORD input_record, double timestamp)
 {
     switch(input_record.EventType) {
     case KEY_EVENT:
-        return key_event(input_record.Event.KeyEvent);
+        return key_event(input_record.Event.KeyEvent, timestamp);
     case WINDOW_BUFFER_SIZE_EVENT:
         return resize_event(input_record.Event.WindowBufferSizeEvent);
     default:
@@ -67,7 +68,7 @@ struct InputEvent dispatch_event(INPUT_RECORD input_record)
     }
 }
 
-bool WindowsBlockInput(struct InputEvent event_buf[IO_BUF_SIZE])
+bool WindowsBlockInput(struct InputEvent event_buf[IO_BUF_SIZE], size_t *results)
 {
     static INPUT_RECORD input_buf[IO_BUF_SIZE];
     static DWORD count;
@@ -76,13 +77,16 @@ bool WindowsBlockInput(struct InputEvent event_buf[IO_BUF_SIZE])
     if (!success)
         return false;
 
+    double timestamp = GetTime();
+
     for (size_t i = 0; i < count; i++) {
-        struct InputEvent event = dispatch_event(input_buf[i]);
+        struct InputEvent event = dispatch_event(input_buf[i], timestamp);
         if (event.type == ESCAPE)
             return false;
 
         event_buf[i] = event;
     }
+    *results = count;
     return true;
 }
 

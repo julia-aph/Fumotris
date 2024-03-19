@@ -18,6 +18,7 @@ enum Event {
 struct KeyEvent {
     uint16_t key;
     bool is_down;
+    double timestamp;
 };
 
 struct ResizeEvent {
