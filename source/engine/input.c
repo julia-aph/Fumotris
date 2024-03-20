@@ -7,7 +7,7 @@
 
 #include "dictionary.h"
 
-struct InputAxis
+struct Axis
 {
     uint8_t is_down;
     double last_time_down;
@@ -40,12 +40,12 @@ enum Control
 
 struct Controller NewController(uint16_t *key_codes, enum Control *axis_codes, size_t count)
 {
-    static struct InputAxis DEFAULT_INPUT_AXIS = { 0, 0 };
+    static struct Axis DEFAULT_INPUT_AXIS = { 0, 0 };
     static size_t DEFAULT_WIDTH = 20;
     static size_t DEFAULT_HEIGHT = 10;
 
     struct Dictionary *keybinds = NewDictionary(sizeof(uint16_t), sizeof(enum Control));
-    struct Dictionary *axes = NewDictionary(sizeof(enum Control), sizeof(struct InputAxis));
+    struct Dictionary *axes = NewDictionary(sizeof(enum Control), sizeof(struct Axis));
 
     for(size_t i = 0; i < count; i++)
     {
@@ -94,7 +94,7 @@ void ControllerUnlockRead(struct Controller *ctrl)
     ctrl->readers -= 1;
 }
 
-struct InputAxis *ControllerKeyAxis(struct Controller *controller, uint16_t key_code)
+struct Axis *ControllerKeyAxis(struct Controller *controller, uint16_t key_code)
 {
     uint16_t *axis_code = DictGet(controller->keybinds, &key_code);
     if(axis_code == 0)
@@ -103,7 +103,7 @@ struct InputAxis *ControllerKeyAxis(struct Controller *controller, uint16_t key_
     return DictGet(controller->axes, axis_code);
 }
 
-struct InputAxis *ControllerCodeAxis(struct Controller *controller, enum Control axis_code)
+struct Axis *ControllerCodeAxis(struct Controller *controller, enum Control axis_code)
 {
     return DictGet(controller->axes, &axis_code);
 }
