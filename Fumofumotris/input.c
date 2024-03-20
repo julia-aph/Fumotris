@@ -50,17 +50,17 @@ hash_type Hash(void *item, size_t size)
     return h;
 }
 
-typedef uint16_t ctrl_key;
+typedef uint16_t key_type;
 struct ctrl_bkt {
     hash_type hash;
-    ctrl_key key;
-    size_t index;
+    key_type key;
+    size_t but_index;
 
     struct InputButton button;
 };
 
 struct ctrl_dict {
-    size_t cap;
+    size_t capacity;
     size_t filled;
 
     struct ctrl_bkt buckets[];
@@ -70,54 +70,70 @@ typedef struct Ctrl {
     struct ctrl_dict *dict;
 } Ctrl;
 
-hash_type ctrl_hash(ctrl_key key)
+hash_type ctrl_hash(key_type key)
 {
-    return Hash(key, sizeof(ctrl_key));
+    return Hash(key, sizeof(key_type));
+}
+
+struct ctrl_dict *new_ctrl_dict(size_t cap, size_t filled)
+{
+    size_t bkts_size = cap * sizeof(struct ctrl_bkt);
+    size_t alloc_size = sizeof(struct ctrl_dict) + bkts_size;
+    struct ctrl_dict *dict = malloc(alloc_size);
+    if(!dict)
+        return nullptr;
+
+    dict->capacity = cap;
+    dict->filled = filled;
+    memset(dict->buckets, 0, bkts_size);
 }
 
 Ctrl NewCtrl()
 {
     static const size_t INIT_CAP = 16;
 
-    size_t bkts_size = INIT_CAP * sizeof(struct ctrl_bkt);
-    size_t alloc_size = sizeof(struct ctrl_dict) + bkts_size;
-    struct ctrl_dict *dict = malloc(alloc_size);
-    if (!dict)
-        return ;
-    
-    dict->cap = INIT_CAP;
-    dict->filled = 0;
-    memset(dict->buckets, 0, bkts_size);
-
+    struct ctrl_dict *dict = new_ctrl_dict(INIT_CAP, 0);
     return (Ctrl) { dict };
-    Ctrl ctrl = NewCtrl();
-    if(ctrl->result)
 }
 
-struct ctrl_dict *resize_ctrl(struct ctrl_dict *dict, size_t new_cap)
+void set_bkt(struct ctrl_bkt *bkt, hash_type hash, key_type key, size_t but_index)
 {
-    size_t bkts_size = new_cap * sizeof(struct ctrl_bkt);
-    size_t alloc_size = sizeof(struct ctrl_dict) + bkts_size;
-    struct ctrl_dict *new_dict = malloc(alloc_size);
-    if (!new_dict)
+    bkt->hash = hash;
+    bkt->key = key;
+    bkt->but_index = but_index;
+}
+
+struct ctrl_bkt *get_bkt(struct ctrl_dict *dict, size_t i)
+{
+    return &dict->buckets[i];
+}
+
+void set_button(struct ctrl_dict *dict, size_t but_index, struct InputButton *button)
+{
+    dict->buckets[but_index].button = *button;
+}
+
+struct InputButton *get_button(struct ctrl_dict *dict, size_t but_index)
+{
+    return &dict->buckets[but_index].button;
+}
+
+struct ctrl_dict *ctrl_resize(struct ctrl_dict *dict, size_t new_cap)
+{
+    struct ctrl_dict *new_dict = new_ctrl_dict(new_cap, dict->filled);
+    if(!new_dict)
         return nullptr;
 
-    new_dict->cap = new_cap;
-    new_dict->filled = dict->filled;
-    memset(dict->buckets, 0, bkts_size);
-
-    for (size_t i = 0; i < dict->cap; i++) {
-        hash_type hash = dict->buckets[i].hash;
-        if (hash == 0)
+    for (size_t i = 0; i < dict->capacity; i++) {
+        struct ctrl_bkt *bkt = get_bkt(dict, i);
+        if (bkt->hash == 0)
             continue;
-        size_t new_i = hash % new_cap;
 
-        new_dict->buckets[new_i].hash = hash;
-        new_dict->buckets[new_i].key = dict->buckets[i].key;
+        size_t new_i = bkt->hash % new_cap;
+        struct ctrl_bkt *new_bkt = get_bkt(new_dict, new_i);
 
-        size_t index = dict->buckets[i].index;
-        new_dict->buckets[new_i].index = index;
-        new_dict->buckets[index].button = dict->buckets[i].button;
+        set_bkt(new_bkt, bkt->hash, bkt->key, bkt->but_index);
+        set_button(new_dict, bkt->but_index, get_button(dict, bkt->but_index));
     }
 
     return new_dict;
@@ -128,15 +144,16 @@ size_t lin_probe(struct ctrl_dict *ctrl, size_t i)
 
 }
 
-bool CtrlAdd(Ctrl ctrl, ctrl_key key)
+bool CtrlAdd(Ctrl ctrl, key_type key)
 {
     struct ctrl_dict *dict = ctrl.dict;
-    hash_type hash = ctrl_hash(key);
-    size_t i = hash % dict->cap;
 
-    float load = (float)dict->filled / dict->cap;
-    if (load > 0.75f) {
-        void *ptr = ctrl_resize(dict, dict->cap * 2);
+    hash_type hash = ctrl_hash(key);
+    size_t i = hash % dict->capacity;
+
+    float load_factor = (float)dict->filled / dict->capacity;
+    if (load_factor > 0.75f) {
+        void *ptr = ctrl_resize(dict, dict->capacity * 2);
         if (!ptr)
             return false;
         ctrl.dict = ptr;
@@ -144,21 +161,18 @@ bool CtrlAdd(Ctrl ctrl, ctrl_key key)
 
     if (dict->buckets[i].hash != 0)
         i = lin_probe(dict, i);
-
-    dict->buckets[i].hash = hash;
-    dict->buckets[i].key = key;
-    dict->buckets[i].index = dict->filled;
-
+    
+    set_bkt(&dict->buckets[i], hash, key, dict->filled);
     dict->filled += 1;
 
     return true;
 }
 
-bool CtrlRemove(Ctrl ctrl, ctrl_key key)
+bool CtrlRemove(Ctrl ctrl, key_type key)
 {
     struct ctrl_dict *dict = ctrl.dict;
     hash_type hash = ctrl_hash(key);
-    size_t i = hash % dict->cap;
+    size_t i = hash % dict->capacity;
 
     if (dict->buckets[i].hash == 0)
         return false;

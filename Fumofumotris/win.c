@@ -64,7 +64,9 @@ struct InputEvent dispatch_event(INPUT_RECORD input_record, double timestamp)
     case WINDOW_BUFFER_SIZE_EVENT:
         return resize_event(input_record.Event.WindowBufferSizeEvent);
     default:
-        return (struct InputEvent) { .type = ESCAPE };
+        return (struct InputEvent) {
+            .type = ESCAPE
+        };
     }
 }
 
