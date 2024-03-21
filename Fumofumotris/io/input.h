@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "controller.h"
+#include "fumotris.h"
 
 struct Axis {
     double value;
@@ -15,37 +16,41 @@ struct Axis {
     double last_released;
 };
 
-typedef uint16_t key_type;
-typedef uint8_t mouse_type;
-
 enum InputType {
     KEY,
-    MOUSE_BUTTON,
-
-    MOUSE_MOVE,
+    AXIS,
+    JOYSTICK,
     WINDOW,
     ESCAPE
 };
 
-struct InputUpdate {
+struct InputRecord {
     enum InputType type;
     union {
-        key_type key;
-        mouse_type button;
-    } ident;
+        u16 key;
+        u16 axis;
+        u16 joystick;
+        u16 window;
+    } id;
 
     union {
-        double value;
         struct {
-            uint64_t x : 32;
-            uint64_t y : 32;
-        };
+            float value;
+            bool is_down;
+        } axis;
+        struct {
+            u64 x : 32;
+            u64 y : 32;
+        } joystick;
     } data;
 
     double timestamp;
-    bool is_down;
 };
 
-const size_t IO_BUF_SIZE = 8;
+const size_t io_buf_size = 8;
+struct InputResult {
+    struct InputRecord buf[io_buf_size];
+    size_t count;
+};
 
 void StartInput(Ctrl *ctrl);

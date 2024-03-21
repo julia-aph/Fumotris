@@ -1,10 +1,18 @@
 #pragma once
+#include <iso646.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-#include "input.h"
+#include "fumotris.h";
 
-void WindowsInit();
+bool InitInputHandle();
 
-bool WindowsBlockInput(struct InputUpdate buf[IO_BUF_SIZE], size_t *results);
+bool InitTimer();
 
-void WindowsWait(double seconds);
+bool InitConsoleMode();
+
+bool GetInput(struct InputResult *result);
+
+bool Wait(u64 nanoseconds);

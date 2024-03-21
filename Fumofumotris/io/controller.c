@@ -1,4 +1,3 @@
-#pragma once
 #include <iso646.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -47,25 +46,50 @@ enum JoystickCode {
     MOUSE
 };
 
+typedef u32 hash_type;
+hash_type Hash(void *item, size_t size)
+{
+    u8* data = (u8*)item;
+
+    u32 h = 98317;
+
+    for (size_t i = 0; i < size; i++) {
+        h ^= data[i];
+        h *= 0x5bd1e995;
+        h ^= h >> 15;
+    }
+
+    return h;
+}
+
+hash_type hash_ident(u16f ident, enum InputType type)
+{
+    
+}
+
+struct bkt {
+    hash_type hash;
+    u16 ident;
+    size_t index;
+
+    struct Axis axis;
+};
+
+/*
+[hash, ident]   index   :   axis
+[hash, ident]   index   :   axis
+[hash, ident]   index   :   axis
+*/
+
+struct ctrl_dict {
+    size_t capacity;
+    size_t filled;
+
+    struct bkt bkts; 
+};
+
 struct Ctrl {
     struct ctrl_dict *dict;
 };
 typedef struct Ctrl Ctrl;
 
-struct Ctrl NewCtrl();
-
-bool CtrlUpdateKey(Ctrl *ctrl, struct InputRecord *record);
-
-bool CtrlUpdateAxis(Ctrl *ctrl, struct InputRecord *record);
-
-bool CtrlUpdateJoystick(Ctrl *ctrl, struct InputRecord *record);
-
-bool CtrlUpdateWindow(Ctrl *ctrl, struct InputRecord *record);
-
-struct Axis *CtrlGetKey(Ctrl *ctrl, enum KeyCode key);
-
-struct Axis *CtrlGetAxis(Ctrl *ctrl, enum AxisCode axis);
-
-struct Axis *CtrlGetJoystick(Ctrl *ctrl, enum JoystickCode joystick);
-
-struct Axis *CtrlGetWindow(Ctrl *ctrl, u16f window);

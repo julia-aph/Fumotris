@@ -10,82 +10,81 @@
 #include "controller.h"
 
 #ifdef _WIN32
-#include "win.h"
+#include "winio.h"
 #endif
-
-struct Axis {
-    double value;
-    double last_pressed;
-    double last_released;
-};
-
-typedef uint16_t key_type;
-typedef uint8_t mouse_type;
 
 enum InputType {
     KEY,
-    MOUSE_BUTTON,
-
-    MOUSE_MOVE,
+    AXIS,
+    JOYSTICK,
     WINDOW,
     ESCAPE
 };
 
-struct InputUpdate {
+struct InputRecord {
     enum InputType type;
     union {
-        key_type key;
-        mouse_type button;
-    };
+        u16 key;
+        u16 axis;
+        u16 joystick;
+        u16 window;
+    } id;
 
     union {
-        double value;
         struct {
-            uint64_t x : 32;
-            uint64_t y : 32;
-        };
-    };
+            float value;
+            bool is_down;
+        } axis;
+        struct {
+            u64 x : 32;
+            u64 y : 32;
+        } joystick;
+    } data;
 
     double timestamp;
-    bool is_down;
 };
 
-bool dispatch(Ctrl *ctrl, struct InputUpdate *event)
+const size_t io_buf_size = 8;
+struct InputResult {
+    struct InputRecord buf[io_buf_size];
+    size_t count;
+};
+
+bool dispatch(Ctrl *ctrl, struct InputRecord *record)
 {
-    switch (event->type) {
+    switch (record->type) {
     case KEY:
-        return CtrlUpdateKey(ctrl, event);
-    case MOUSE_BUTTON:
-        return CtrlUpdateBut(ctrl, event);
-    
-    case MOUSE_MOVE:
-        return CtrlUpdateMouse(ctrl, event);
+        return CtrlUpdateKey(ctrl, record);
+    case AXIS:
+        return CtrlUpdateAxis(ctrl, record);
+    case JOYSTICK:
+        return CtrlUpdateJoystick(ctrl, record);
     case WINDOW:
-        return CtrlUpdateWin(ctrl, event);
+        return CtrlUpdateWindow(ctrl, record);
     case ESCAPE:
         exit(1);
     }
     return false;
 }
 
-const size_t IO_BUF_SIZE = 8;
 void block_input(void *args)
 {
     Ctrl *ctrl = args;
-
-    struct InputUpdate buf[IO_BUF_SIZE];
-    size_t count;
+    struct InputResult result;
 
 input_loop:
     bool success;
     #ifdef _WIN32
-    success = WindowsBlockInput(buf, &count);
+    success = WindowsBlockInput(&result);
     #endif
+
     if (!success)
         exit(1);
 
-    for (size_t i = 0; i < count; i++) {
-        bool success = dispatch(ctrl, buf + i);
+    double now = GetTime();
+    for (size_t i = 0; i < result.count; i++) {
+        result.buf[i].timestamp = now;
+        bool success = dispatch(ctrl, &result.buf[i]);
     }
 
     goto input_loop;
@@ -94,5 +93,5 @@ input_loop:
 void StartInput(Ctrl *ctrl)
 {
     pthread_t input_thread;
-    pthread_create(&input_thread, null, block_input, ctrl);
+    pthread_create(&input_thread, nullptr, block_input, ctrl);
 }
